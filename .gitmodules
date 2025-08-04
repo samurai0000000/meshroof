@@ -1,0 +1,6 @@
+[submodule "esp-idf"]
+	path = esp-idf
+	url = https://github.com/espressif/esp-idf.git
+[submodule "libmeshtastic"]
+	path = libmeshtastic
+	url = https://github.com/samurai0000000/libmeshtastic
