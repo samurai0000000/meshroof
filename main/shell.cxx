@@ -365,16 +365,19 @@ void shell_init(void)
     shell_printf("> ");
 }
 
-void shell_process(void)
+int shell_process(void)
 {
-    int ret;
+    int ret = 0;
+    int rx;
     char c;
 
     while (usb_rx_ready() > 0) {
-        ret = usb_rx_read((uint8_t *) &c, 1);
-        if (ret == 0) {
+        rx = usb_rx_read((uint8_t *) &c, 1);
+        if (rx == 0) {
             break;
         }
+
+        ret += rx;
 
         if (c == '\r') {
             inproc.cmdline[inproc.i] = '\0';
@@ -399,6 +402,8 @@ void shell_process(void)
             }
         }
     }
+
+    return ret;
 }
 
 /*

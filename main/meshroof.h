@@ -23,18 +23,15 @@
 #endif
 #endif
 
+#include "serial.h"
+
 EXTERN_C_BEGIN
 
 extern void led_init(void);
 extern void led_set(bool on);
 
-extern void serial_init(void);
-extern int usb_printf(const char *fmt, ...);
-extern int usb_rx_ready(void);
-extern int usb_rx_read(uint8_t *data, size_t size);
-
 extern void shell_init(void);
-extern void shell_process(void);
+extern int shell_process(void);
 
 EXTERN_C_END
 

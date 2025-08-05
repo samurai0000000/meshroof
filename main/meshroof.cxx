@@ -31,8 +31,9 @@ shared_ptr<MeshRoof> meshroof = NULL;
 
 extern "C" void app_main(void)
 {
+    int ret;
     bool led_on = false;
-    uint32_t now, last_flip;
+    uint32_t now, last_flip, last_want_config, last_heartbeat;
 
     ESP_LOGI(TAG, "meshroof.cxx app_main");
 
@@ -57,6 +58,8 @@ extern "C" void app_main(void)
 
     now = (uint32_t) (esp_timer_get_time() / 1000000);
     last_flip = now;
+    last_heartbeat = now;
+    last_want_config = 0;
 
     for (;;) {
         now = (uint32_t) (esp_timer_get_time() / 1000000);
@@ -67,7 +70,42 @@ extern "C" void app_main(void)
             last_flip = now;
         }
 
-        shell_process();
+        if (!meshroof->isConnected() && ((now - last_want_config) >= 5)) {
+            ret = meshroof->sendWantConfig();
+            if (ret == false) {
+                usb_printf("sendWantConfig failed!\n");
+            }
+
+            last_want_config = now;
+        } else if (meshroof->isConnected()) {
+            last_want_config = now;
+        }
+
+        if (meshroof->isConnected() && ((now - last_heartbeat) >= 60)) {
+            ret = meshroof->sendHeartbeat();
+            if (ret == false) {
+                usb_printf("sendHeartbeat failed!\n");
+            }
+
+            last_heartbeat = now;
+        }
+
+        while (usb_rx_ready() > 0) {
+            ret = shell_process();
+            if (ret <= 0) {
+                break;
+            }
+        }
+
+        while (serial_rx_ready() > 0) {
+            ret = mt_serial_process(&meshroof->_mtc, 0);
+            if (ret != 0) {
+                usb_printf("mt_serial_process failed!\n");
+                break;
+            }
+        }
+
+        taskYIELD();
     }
 }
 

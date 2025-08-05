@@ -6,6 +6,7 @@
 
 #include <fcntl.h>
 #include <sys/select.h>
+#include <driver/gpio.h>
 #include <driver/uart.h>
 #include <driver/uart_vfs.h>
 #include <driver/usb_serial_jtag.h>
@@ -17,13 +18,30 @@
 
 #define SERIAL_PBUF_SIZE  256
 
-#define BUF_SIZE 1024
+#define SERIAL_RX_PIN GPIO_NUM_44
+#define SERIAL_TX_PIN GPIO_NUM_43
+#define UART_BUF_SIZE 256
 
 static const char *TAG = "serial";
+
+static int fd = -1;
 
 void serial_init(void)
 {
     int ret;
+
+    usb_serial_jtag_driver_config_t usb_serial_jtag_config = {
+        .rx_buffer_size = UART_BUF_SIZE,
+        .tx_buffer_size = UART_BUF_SIZE,
+    };
+
+    // Set up the USB/Serial/JTAG driver first (console over USB CDC)
+    ret = usb_serial_jtag_driver_install(&usb_serial_jtag_config);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "usb_serial_jtag_driver_install failed!");
+        goto done;
+    }
+
     uart_config_t uart_config = {
         .baud_rate = 115200,
         .data_bits = UART_DATA_8_BITS,
@@ -32,25 +50,36 @@ void serial_init(void)
         .flow_ctrl = UART_HW_FLOWCTRL_DISABLE,
         .source_clk = UART_SCLK_DEFAULT,
     };
-    usb_serial_jtag_driver_config_t usb_serial_jtag_config = {
-        .rx_buffer_size = BUF_SIZE,
-        .tx_buffer_size = BUF_SIZE,
-    };
 
-    ret = uart_driver_install(UART_NUM_0, 2 * 1024, 0, 0, NULL, 0);
+    ret = uart_driver_install(UART_NUM_0, UART_BUF_SIZE * 2,
+                              0, 0, NULL, 0);
     if (ret!= ESP_OK) {
         ESP_LOGE(TAG, "uart_driver_install failed!");
         goto done;
 	}
 
-    uart_param_config(UART_NUM_0, &uart_config);
-    uart_vfs_dev_use_driver(UART_NUM_0);
-
-    ret = usb_serial_jtag_driver_install(&usb_serial_jtag_config);
+    ret = uart_param_config(UART_NUM_0, &uart_config);
     if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "usb_serial_jtag_driver_install failed!");
+        ESP_LOGE(TAG, "uart_param_config failed!");
         goto done;
     }
+
+    uart_vfs_dev_use_driver(UART_NUM_0);
+
+    ret = uart_set_pin(UART_NUM_0, SERIAL_TX_PIN, SERIAL_RX_PIN,
+                       UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "uart_set_pin failed!");
+    }
+
+
+    fd = open("/dev/uart/0", O_RDWR);
+    if (fd == -1) {
+        ESP_LOGE(TAG, "open /dev/uart/0 failed!");
+        goto done;
+    }
+
+    uart_vfs_dev_use_driver(UART_NUM_0);
 
 done:
 
@@ -85,8 +114,48 @@ int usb_rx_ready(void)
 
 int usb_rx_read(uint8_t *data, size_t size)
 {
-    return usb_serial_jtag_read_bytes(data, size,
-                                      50 / portTICK_PERIOD_MS);
+    return usb_serial_jtag_read_bytes(data, size, 0);
+}
+
+int serial_write(const void *buf, size_t len)
+{
+    return uart_write_bytes(UART_NUM_0, buf, len);
+}
+
+int serial_rx_ready(void)
+{
+    int ret = 0;
+    fd_set rfds;
+    struct timeval timeout = {
+        .tv_sec = 0,
+        .tv_usec = 0,
+    };
+
+    if (fd == -1) {
+        ret = -1;
+        goto done;
+    }
+
+    FD_ZERO(&rfds);
+    FD_SET(fd, &rfds);
+
+    ret = select(fd + 1, &rfds, NULL, NULL, &timeout);
+
+done:
+
+    return ret;
+}
+
+int serial_read(void *buf, size_t len)
+{
+    int ret = 0;
+
+    ret = serial_rx_ready();
+    if (ret > 0) {
+        ret = uart_read_bytes(UART_NUM_0, buf, len, 0);
+    }
+
+    return ret;
 }
 
 /*

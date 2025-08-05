@@ -23,12 +23,16 @@ distclean:
 
 meshroof: build/meshroof.bin
 
-build/meshroof.bin: build/Makefile
+build/meshroof.bin: build/Makefile sdkconfig
 	@$(MAKE) -C build
 
 build/Makefile: CMakeLists.txt
 	@mkdir -p build
 	@cd build && cmake ..
+
+sdkconfig: misc/sdkconfig
+	@echo install misc/sdkconfig
+	@cp -f $< $@
 
 .PHONY: menuconfig
 
@@ -37,9 +41,15 @@ menuconfig: build/Makefile
 
 # Development & debug targets
 
-ESPPORT ?=	/dev/ttyACM2
+ESPPORT ?=	$(shell misc/find_espressif_serial.sh)
 
 .PHONY: flash
 
 flash: build/Makefile
 	@$(MAKE) -C build flash ESPPORT=$(ESPPORT)
+
+.PHONY: reset
+
+reset:
+	@esptool.py --port $(ESPPORT) \
+		--before default_reset --after hard_reset chip_id
