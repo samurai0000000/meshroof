@@ -17,7 +17,7 @@ clean:
 	@test -f build/Makefile && $(MAKE) -C build clean
 
 distclean:
-	rm -rf build/
+	rm -rf build/ sdkconfig
 
 .PHONY: meshroof
 
@@ -29,3 +29,17 @@ build/meshroof.bin: build/Makefile
 build/Makefile: CMakeLists.txt
 	@mkdir -p build
 	@cd build && cmake ..
+
+.PHONY: menuconfig
+
+menuconfig: build/Makefile
+	@$(MAKE) -C build $@
+
+# Development & debug targets
+
+ESPPORT ?=	/dev/ttyACM2
+
+.PHONY: flash
+
+flash: build/Makefile
+	@$(MAKE) -C build flash ESPPORT=$(ESPPORT)
