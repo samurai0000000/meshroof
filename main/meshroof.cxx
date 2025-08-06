@@ -33,7 +33,7 @@ extern "C" void app_main(void)
 {
     int ret;
     bool led_on = false;
-    uint32_t now, last_flip, last_want_config, last_heartbeat;
+    time_t now, last_flip, last_want_config, last_heartbeat;
 
     ESP_LOGI(TAG, "meshroof.cxx app_main");
 
@@ -56,13 +56,13 @@ extern "C" void app_main(void)
 
     shell_init();
 
-    now = (uint32_t) (esp_timer_get_time() / 1000000);
+    now = time(NULL);
     last_flip = now;
     last_heartbeat = now;
     last_want_config = 0;
 
     for (;;) {
-        now = (uint32_t) (esp_timer_get_time() / 1000000);
+        now = time(NULL);
 
         if ((now - last_flip) >= 1) {
             led_on = !led_on;

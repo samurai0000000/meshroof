@@ -8,6 +8,9 @@
 #include <malloc.h>
 #include <string.h>
 #include <strings.h>
+#include <esp_timer.h>
+#include <esp_system.h>
+#include <esp_heap_caps.h>
 #include <meshroof.h>
 #include <libmeshtastic.h>
 #include <memory>
@@ -45,8 +48,31 @@ static int version(int argc, char **argv)
 
 static int system(int argc, char **argv)
 {
+    size_t total_heap = heap_caps_get_total_size(MALLOC_CAP_INTERNAL);
+    size_t free_heap = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
+    size_t used_heap = total_heap - free_heap;
+    unsigned int uptime, days, hour, min, sec;
+    int64_t since_boot;
+
     (void)(argc);
     (void)(argv);
+
+    since_boot = esp_timer_get_time();
+    uptime = since_boot / 1000000;
+    sec = (uptime % 60);
+    min = (uptime / 60) % 60;
+    hour = (uptime / 3600) % 24;
+    days = (uptime) / 86400;
+    if (days == 0) {
+        shell_printf("   Up-time: %.2u:%.2u:%.2u\n",
+                     hour, min, sec);
+    } else {
+        shell_printf("   Up-time: %ud %.2u:%.2u:%.2u\n",
+                     days, hour, min, sec);
+    }
+    shell_printf("Total Heap: %zu\n", total_heap);
+    shell_printf(" Free Heap: %zu\n", free_heap);
+    shell_printf(" Used Heap: %zu\n", used_heap);
 
     return 0;
 }
@@ -57,7 +83,7 @@ static int reboot(int argc, char **argv)
     (void)(argv);
 
     meshroof->sendDisconnect();
-    //watchdog_enable(1, 0);
+    esp_restart();
     for (;;);
 
     return 0;
