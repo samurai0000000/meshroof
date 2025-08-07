@@ -7,14 +7,17 @@
 #ifndef MESHROOF_HXX
 #define MESHROOF_HXX
 
+#include <memory>
 #include <SimpleClient.hxx>
+#include <HomeChat.hxx>
 
 using namespace std;
 
 /*
  * Suitable for use on resource-constraint MCU platforms.
  */
-class MeshRoof : public SimpleClient {
+class MeshRoof : public SimpleClient, public HomeChat,
+                 public enable_shared_from_this<MeshRoof> {
 
 public:
 
@@ -31,6 +34,10 @@ protected:
                             const meshtastic_Routing &routing);
     virtual void gotTraceRoute(const meshtastic_MeshPacket &packet,
                                const meshtastic_RouteDiscovery &routeDiscovery);
+
+protected:
+
+    virtual int vprintf(const char *format, va_list ap) const;
 
 };
 

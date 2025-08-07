@@ -14,6 +14,7 @@ set(LIBMESHTASTIC_SRCS
   ${LIBMESHTASTIC_PATH}/serial-esp32.c
   ${LIBMESHTASTIC_PATH}/protocol.c
   ${LIBMESHTASTIC_PATH}/SimpleClient.cxx
+  ${LIBMESHTASTIC_PATH}/HomeChat.cxx
   )
 idf_component_register(
   SRCS

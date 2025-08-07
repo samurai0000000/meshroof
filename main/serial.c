@@ -4,6 +4,7 @@
  * Copyright (C) 2025, Charles Chiou
  */
 
+#include <stdarg.h>
 #include <fcntl.h>
 #include <sys/select.h>
 #include <driver/gpio.h>
@@ -86,16 +87,25 @@ done:
     return;
 }
 
-int usb_printf(const char *fmt, ...)
+int usb_printf(const char *format, ...)
 {
-    int ret;
+    int ret = 0;
     va_list ap;
+
+    va_start(ap, format);
+    ret = usb_vprintf(format, ap);
+    va_end(ap);
+
+    return ret;
+}
+
+int usb_vprintf(const char *format, va_list ap)
+{
+    int ret = 0;
     char pbuf[SERIAL_PBUF_SIZE];
     int i;
 
-    va_start(ap, fmt);
-    ret = vsnprintf(pbuf, SERIAL_PBUF_SIZE - 1, fmt, ap);
-    va_end(ap);
+    ret = vsnprintf(pbuf, SERIAL_PBUF_SIZE - 1, format, ap);
 
     for (i = 0; i < ret; i++) {
         if (pbuf[i] == '\n') {

@@ -43,6 +43,7 @@ extern "C" void app_main(void)
     gpio_set_direction(BLINK_GPIO, GPIO_MODE_OUTPUT);
 
     meshroof = make_shared<MeshRoof>();
+    meshroof->setClient(meshroof);
     meshroof->sendDisconnect();
     vTaskDelay(200 / portTICK_PERIOD_MS);
 
