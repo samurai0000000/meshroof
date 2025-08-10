@@ -15,6 +15,7 @@ set(LIBMESHTASTIC_SRCS
   ${LIBMESHTASTIC_PATH}/protocol.c
   ${LIBMESHTASTIC_PATH}/SimpleClient.cxx
   ${LIBMESHTASTIC_PATH}/HomeChat.cxx
+  ${LIBMESHTASTIC_PATH}/BaseNVM.cxx
   )
 idf_component_register(
   SRCS
@@ -26,6 +27,6 @@ idf_component_register(
   INCLUDE_DIRS "." "${LIBMESHTASTIC_PATH}" "${MESHARDUINO_PATH}"
   "${CMAKE_CURRENT_BINARY_DIR}/../../"
   REQUIRES esp_driver_gpio esp_driver_uart esp_driver_usb_serial_jtag console
-           esp_timer
+           esp_timer esp_netif esp_wifi nvs_flash
   )
 

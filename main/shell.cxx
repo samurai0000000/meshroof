@@ -290,6 +290,251 @@ done:
     return ret;
 }
 
+static int authchan(int argc, char **argv)
+{
+    int ret = 0;
+    bool result;
+
+    if (argc == 1) {
+        shell_printf("list of authchans:\n");
+        for (unsigned int i = 0; i < meshroof->nvmAuthchans().size(); i++) {
+            shell_printf("  %s\n", meshroof->nvmAuthchans()[i].name);
+        }
+    } else if ((argc == 3) && strcmp(argv[1], "add") == 0) {
+        result = meshroof->addNvmAuthChannel(argv[2], *meshroof);
+        if (result == false) {
+            shell_printf("addNvmAuthChannel failed!\n");
+            ret = -1;
+            goto done;
+        }
+        result = meshroof->applyNvmToHomeChat();
+        if (result == false) {
+            shell_printf("applyNvmToHomeChat failed!\n");
+            ret = -1;
+            goto done;
+        }
+        result = meshroof->saveNvm();
+        if (result == false) {
+            shell_printf("saveNvm failed!\n");
+            ret = -1;
+            goto done;
+        }
+        shell_printf("ok\n");
+    } else if ((argc == 3) && strcmp(argv[1], "del") == 0) {
+        result = meshroof->delNvmAuthChannel(argv[2]);
+        if (result == false) {
+            shell_printf("delNvmAuthChannel failed!\n");
+            ret = -1;
+            goto done;
+        }
+        result = meshroof->applyNvmToHomeChat();
+        if (result == false) {
+            shell_printf("applyNvmToHomeChat failed!\n");
+            ret = -1;
+            goto done;
+        }
+        result = meshroof->saveNvm();
+        if (result == false) {
+            shell_printf("saveNvm failed!\n");
+            ret = -1;
+            goto done;
+        }
+        shell_printf("ok\n");
+    } else {
+        shell_printf("syntax error!\n");
+        ret = -1;
+        goto done;
+    }
+
+    ret = 0;
+
+done:
+
+    return ret;
+}
+
+static int authchans(int argc, char **argv)
+{
+    argc = 1;
+    return authchan(argc, argv);
+}
+
+static int admin(int argc, char **argv)
+{
+    int ret = 0;
+    bool result;
+
+    if (argc == 1) {
+        unsigned int i;
+        shell_printf("list of admins:\n");
+        for (i = 0; i < meshroof->nvmAdmins().size(); i++) {
+            uint32_t node_num = meshroof->nvmAdmins()[i].node_num;
+            if ((i % 4) == 0) {
+                shell_printf("  ");
+            }
+            shell_printf("%16s  ",
+                           meshroof->getDisplayName(node_num).c_str());
+            if ((i % 4) == 3) {
+                shell_printf("\n");
+            }
+        }
+        if ((i % 4) != 0) {
+            shell_printf("\n");
+        }
+    } else if ((argc == 3) && strcmp(argv[1], "add") == 0) {
+        result = meshroof->addNvmAdmin(argv[2], *meshroof);
+        if (result == false) {
+            shell_printf("addNvmAdmin failed!\n");
+            ret = -1;
+            goto done;
+        }
+        result = meshroof->applyNvmToHomeChat();
+        if (result == false) {
+            shell_printf("applyNvmToHomeChat failed!\n");
+            ret = -1;
+            goto done;
+        }
+        result = meshroof->saveNvm();
+        if (result == false) {
+            shell_printf("saveNvm failed!\n");
+            ret = -1;
+            goto done;
+        }
+        shell_printf("ok\n");
+    } else if ((argc == 3) && strcmp(argv[1], "del") == 0) {
+        result = meshroof->delNvmAdmin(argv[2], *meshroof);
+        if (result == false) {
+            shell_printf("delNvmAdmin failed!\n");
+            ret = -1;
+            goto done;
+        }
+        result = meshroof->applyNvmToHomeChat();
+        if (result == false) {
+            shell_printf("applyNvmToHomeChat failed!\n");
+            ret = -1;
+            goto done;
+        }
+        result = meshroof->saveNvm();
+        if (result == false) {
+            shell_printf("saveNvm failed!\n");
+            ret = -1;
+            goto done;
+        }
+        shell_printf("ok\n");
+    } else {
+        shell_printf("syntax error!\n");
+        ret = -1;
+        goto done;
+    }
+
+    ret = 0;
+
+done:
+
+    return ret;
+}
+
+static int admins(int argc, char **argv)
+{
+    argc = 1;
+    return admin(argc, argv);
+}
+
+static int mate(int argc, char **argv)
+{
+    int ret = 0;
+    bool result;
+
+    if (argc == 1) {
+        unsigned int i;
+        shell_printf("list of mates:\n");
+        for (i = 0; i < meshroof->nvmMates().size(); i++) {
+            uint32_t node_num = meshroof->nvmMates()[i].node_num;
+            if ((i % 4) == 0) {
+                shell_printf("  ");
+            }
+            shell_printf("%16s  ",
+                           meshroof->getDisplayName(node_num).c_str());
+            if ((i % 4) == 3) {
+                shell_printf("\n");
+            }
+        }
+        if ((i % 4) != 0) {
+            shell_printf("\n");
+        }
+    } else if ((argc == 3) && strcmp(argv[1], "add") == 0) {
+        result = meshroof->addNvmMate(argv[2], *meshroof);
+        if (result == false) {
+            shell_printf("addNvmMate failed!\n");
+            ret = -1;
+            goto done;
+        }
+        result = meshroof->applyNvmToHomeChat();
+        if (result == false) {
+            shell_printf("applyNvmToHomeChat failed!\n");
+            ret = -1;
+            goto done;
+        }
+        result = meshroof->saveNvm();
+        if (result == false) {
+            shell_printf("saveNvm failed!\n");
+            ret = -1;
+            goto done;
+        }
+        shell_printf("ok\n");
+    } else if ((argc == 3) && strcmp(argv[1], "del") == 0) {
+        result = meshroof->delNvmMate(argv[2], *meshroof);
+        if (result == false) {
+            shell_printf("delNvmMate failed!\n");
+            ret = -1;
+            goto done;
+        }
+        result = meshroof->applyNvmToHomeChat();
+        if (result == false) {
+            shell_printf("applyNvmToHomeChat failed!\n");
+            ret = -1;
+            goto done;
+        }
+        result = meshroof->saveNvm();
+        if (result == false) {
+            shell_printf("saveNvm failed!\n");
+            ret = -1;
+            goto done;
+        }
+        shell_printf("ok\n");
+    } else {
+        shell_printf("syntax error!\n");
+        ret = -1;
+        goto done;
+    }
+
+    ret = 0;
+
+done:
+
+    return ret;
+}
+
+static int mates(int argc, char **argv)
+{
+    argc = 1;
+    return mate(argc, argv);
+}
+
+static int nvm(int argc, char **argv)
+{
+    if (argc != 1) {
+        shell_printf("syntax error!\n");
+        return -1;
+    }
+
+    authchan(argc, argv);
+    admin(argc, argv);
+    mate(argc, argv);
+
+    return 0;
+}
+
 static int help(int argc, char **argv);
 
 static struct cmd_handler cmd_handlers[] = {
@@ -303,6 +548,13 @@ static struct cmd_handler cmd_handlers[] = {
     { "heartbeat", heartbeat, },
     { "dm", direct_message },
     { "cm", channel_message, },
+    { "authchan", authchan, },
+    { "authchans", authchans, },
+    { "admin", admin, },
+    { "admins", admins, },
+    { "mate", mate, },
+    { "mates", mates, },
+    { "nvm", nvm, },
     { NULL, NULL, },
 };
 

@@ -15,6 +15,8 @@
 #include <driver/usb_serial_jtag.h>
 #include <esp_timer.h>
 #include <esp_log.h>
+#include <nvs_flash.h>
+#include <nvs.h>
 #include <meshroof.h>
 #include <MeshRoof.hxx>
 #include "version.h"
@@ -33,6 +35,7 @@ extern "C" void app_main(void)
 {
     int ret;
     bool led_on = false;
+    esp_err_t err;
     time_t now, last_flip, last_want_config, last_heartbeat;
 
     ESP_LOGI(TAG, "meshroof.cxx app_main");
@@ -42,9 +45,22 @@ extern "C" void app_main(void)
     gpio_reset_pin(BLINK_GPIO);
     gpio_set_direction(BLINK_GPIO, GPIO_MODE_OUTPUT);
 
+    err = nvs_flash_init();
+    if ((err == ESP_ERR_NVS_NO_FREE_PAGES) ||
+        (err == ESP_ERR_NVS_NEW_VERSION_FOUND)) {
+        ESP_ERROR_CHECK(nvs_flash_erase());
+        err = nvs_flash_init();
+    }
+    ESP_ERROR_CHECK(err);
+
     meshroof = make_shared<MeshRoof>();
     meshroof->setClient(meshroof);
     meshroof->sendDisconnect();
+    if (meshroof->loadNvm() == false) {
+        meshroof->saveNvm();  // Create a default
+    }
+    meshroof->applyNvmToHomeChat();
+
     vTaskDelay(200 / portTICK_PERIOD_MS);
 
     usb_printf("\n\x1b[2K");
