@@ -353,12 +353,6 @@ done:
     return ret;
 }
 
-static int authchans(int argc, char **argv)
-{
-    argc = 1;
-    return authchan(argc, argv);
-}
-
 static int admin(int argc, char **argv)
 {
     int ret = 0;
@@ -432,12 +426,6 @@ static int admin(int argc, char **argv)
 done:
 
     return ret;
-}
-
-static int admins(int argc, char **argv)
-{
-    argc = 1;
-    return admin(argc, argv);
 }
 
 static int mate(int argc, char **argv)
@@ -515,12 +503,6 @@ done:
     return ret;
 }
 
-static int mates(int argc, char **argv)
-{
-    argc = 1;
-    return mate(argc, argv);
-}
-
 static int nvm(int argc, char **argv)
 {
     if (argc != 1) {
@@ -549,11 +531,8 @@ static struct cmd_handler cmd_handlers[] = {
     { "dm", direct_message },
     { "cm", channel_message, },
     { "authchan", authchan, },
-    { "authchans", authchans, },
     { "admin", admin, },
-    { "admins", admins, },
     { "mate", mate, },
-    { "mates", mates, },
     { "nvm", nvm, },
     { NULL, NULL, },
 };
