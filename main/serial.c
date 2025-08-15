@@ -127,6 +127,11 @@ int usb_rx_read(uint8_t *data, size_t size)
     return usb_serial_jtag_read_bytes(data, size, 0);
 }
 
+int usb_rx_read_timeout(uint8_t *data, size_t size, unsigned int ticks)
+{
+    return usb_serial_jtag_read_bytes(data, size, ticks);
+}
+
 int serial_write(const void *buf, size_t len)
 {
     return uart_write_bytes(UART_NUM_0, buf, len);

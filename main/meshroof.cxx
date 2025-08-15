@@ -23,6 +23,11 @@
 
 #define BLINK_GPIO (gpio_num_t) 21
 
+#define LED_TASK_STACK_SIZE            configMINIMAL_STACK_SIZE
+#define LED_TASK_PRIORITY              (tskIDLE_PRIORITY + 1UL)
+#define CONSOLE_TASK_STACK_SIZE        (4 * 1024)
+#define CONSOLE_TASK_PRIORITY          (tskIDLE_PRIORITY + 2UL)
+
 extern void serial_init(void);
 
 using namespace std;
@@ -31,37 +36,26 @@ static const char *TAG = "meshroof";
 
 shared_ptr<MeshRoof> meshroof = NULL;
 
-extern "C" void app_main(void)
+void led_task(__unused void *params)
 {
-    int ret;
     bool led_on = false;
-    esp_err_t err;
-    time_t now, last_flip, last_want_config, last_heartbeat;
-
-    ESP_LOGI(TAG, "meshroof.cxx app_main");
-
-    serial_init();
 
     gpio_reset_pin(BLINK_GPIO);
     gpio_set_direction(BLINK_GPIO, GPIO_MODE_OUTPUT);
 
-    err = nvs_flash_init();
-    if ((err == ESP_ERR_NVS_NO_FREE_PAGES) ||
-        (err == ESP_ERR_NVS_NEW_VERSION_FOUND)) {
-        ESP_ERROR_CHECK(nvs_flash_erase());
-        err = nvs_flash_init();
-    }
-    ESP_ERROR_CHECK(err);
+    for (;;) {
+        gpio_set_level(BLINK_GPIO, led_on);
+        led_on = !led_on;
 
-    meshroof = make_shared<MeshRoof>();
-    meshroof->setClient(meshroof);
-    meshroof->sendDisconnect();
-    if (meshroof->loadNvm() == false) {
-        meshroof->saveNvm();  // Create a default
+        vTaskDelay(pdMS_TO_TICKS(1000));
     }
-    meshroof->applyNvmToHomeChat();
+}
 
-    vTaskDelay(200 / portTICK_PERIOD_MS);
+void console_task(__unused void *params)
+{
+    int ret;
+
+    vTaskDelay(pdMS_TO_TICKS(1000));
 
     usb_printf("\n\x1b[2K");
     usb_printf("The meshroof firmware for ESP32-S3\n");
@@ -70,22 +64,31 @@ extern "C" void app_main(void)
                MYPROJECT_WHOAMI, MYPROJECT_HOSTNAME, MYPROJECT_DATE);
     usb_printf("-------------------------------------------\n");
     usb_printf("Copyright (C) 2025, Charles Chiou\n");
+    usb_printf("> ");
 
-    shell_init();
+    for (;;) {
+        while (usb_rx_ready() > 0) {
+            ret = shell_process();
+            if (ret <= 0) {
+                break;
+            }
+        }
+
+        taskYIELD();
+    }
+}
+
+void meshtastic_task(__unused void *params)
+{
+    int ret;
+    time_t now, last_want_config, last_heartbeat;
 
     now = time(NULL);
-    last_flip = now;
     last_heartbeat = now;
     last_want_config = 0;
 
     for (;;) {
         now = time(NULL);
-
-        if ((now - last_flip) >= 1) {
-            led_on = !led_on;
-            gpio_set_level(BLINK_GPIO, led_on);
-            last_flip = now;
-        }
 
         if (!meshroof->isConnected() && ((now - last_want_config) >= 5)) {
             ret = meshroof->sendWantConfig();
@@ -107,13 +110,6 @@ extern "C" void app_main(void)
             last_heartbeat = now;
         }
 
-        while (usb_rx_ready() > 0) {
-            ret = shell_process();
-            if (ret <= 0) {
-                break;
-            }
-        }
-
         while (serial_rx_ready() > 0) {
             ret = mt_serial_process(&meshroof->_mtc, 0);
             if (ret != 0) {
@@ -124,6 +120,51 @@ extern "C" void app_main(void)
 
         taskYIELD();
     }
+}
+
+extern "C" void app_main(void)
+{
+    esp_err_t err;
+
+    ESP_LOGI(TAG, "meshroof.cxx app_main");
+
+    serial_init();
+
+    err = nvs_flash_init();
+    if ((err == ESP_ERR_NVS_NO_FREE_PAGES) ||
+        (err == ESP_ERR_NVS_NEW_VERSION_FOUND)) {
+        ESP_ERROR_CHECK(nvs_flash_erase());
+        err = nvs_flash_init();
+    }
+    ESP_ERROR_CHECK(err);
+
+    meshroof = make_shared<MeshRoof>();
+    meshroof->setClient(meshroof);
+    meshroof->sendDisconnect();
+    if (meshroof->loadNvm() == false) {
+        meshroof->saveNvm();  // Create a default
+    }
+    meshroof->applyNvmToHomeChat();
+
+    shell_init();
+
+    xTaskCreatePinnedToCore(led_task,
+                            "LedTask",
+                            LED_TASK_STACK_SIZE,
+                            NULL,
+                            LED_TASK_PRIORITY,
+                            NULL,
+                            1);
+
+    xTaskCreatePinnedToCore(console_task,
+                            "ConsoleTask",
+                            CONSOLE_TASK_STACK_SIZE,
+                            NULL,
+                            CONSOLE_TASK_PRIORITY,
+                            NULL,
+                            1);
+
+    meshtastic_task(NULL);
 }
 
 /*

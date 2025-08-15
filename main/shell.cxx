@@ -11,6 +11,8 @@
 #include <esp_timer.h>
 #include <esp_system.h>
 #include <esp_heap_caps.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
 #include <meshroof.h>
 #include <libmeshtastic.h>
 #include <memory>
@@ -92,81 +94,92 @@ static int reboot(int argc, char **argv)
 static int status(int argc, char **argv)
 {
     int ret = 0;
+    unsigned int i;
+    map<uint32_t, meshtastic_DeviceMetrics>::const_iterator dev;
+    map<uint32_t, meshtastic_EnvironmentMetrics>::const_iterator env;
 
     (void)(argc);
     (void)(argv);
 
     if (!meshroof->isConnected()) {
         shell_printf("Not connected\n");
-    } else {
-        unsigned int i;
+        goto done;
+    }
 
-        shell_printf("Me: %s %s\n",
-                      meshroof->getDisplayName(meshroof->whoami()).c_str(),
-                      meshroof->lookupLongName(meshroof->whoami()).c_str());
+    shell_printf("Me: %s %s\n",
+                 meshroof->getDisplayName(meshroof->whoami()).c_str(),
+                 meshroof->lookupLongName(meshroof->whoami()).c_str());
 
-        shell_printf("Channels: %d\n",
-                      meshroof->channels().size());
-        for (map<uint8_t, meshtastic_Channel>::const_iterator it =
-                 meshroof->channels().begin();
-             it != meshroof->channels().end(); it++) {
-            if (it->second.has_settings &&
-                it->second.role != meshtastic_Channel_Role_DISABLED) {
-                shell_printf("chan#%u: %s\n",
-                              (unsigned int) it->second.index,
-                              it->second.settings.name);
-            }
-        }
-
-        shell_printf("Nodes: %d seen\n",
-                      meshroof->nodeInfos().size());
-        i = 0;
-        for (map<uint32_t, meshtastic_NodeInfo>::const_iterator it =
-                 meshroof->nodeInfos().begin();
-             it != meshroof->nodeInfos().end(); it++, i++) {
-            if ((i % 4) == 0) {
-                shell_printf("  ");
-            }
-            shell_printf("%16s  ",
-                          meshroof->getDisplayName(it->second.num).c_str());
-            if ((i % 4) == 3) {
-                shell_printf("\n");
-            }
-        }
-        if ((i % 4) != 0) {
-            shell_printf("\n");
-        }
-
-        map<uint32_t, meshtastic_DeviceMetrics>::const_iterator dev;
-        dev = meshroof->deviceMetrics().find(meshroof->whoami());
-        if (dev != meshroof->deviceMetrics().end()) {
-            if (dev->second.has_channel_utilization) {
-                shell_printf("channel_utilization: %.2f\n",
-                              dev->second.channel_utilization);
-            }
-            if (dev->second.has_air_util_tx) {
-                shell_printf("air_util_tx: %.2f\n",
-                              dev->second.air_util_tx);
-            }
-        }
-
-        map<uint32_t, meshtastic_EnvironmentMetrics>::const_iterator env;
-        env = meshroof->environmentMetrics().find(meshroof->whoami());
-        if (env != meshroof->environmentMetrics().end()) {
-            if (env->second.has_temperature) {
-                shell_printf("temperature: %.2f\n",
-                              env->second.temperature);
-            }
-            if (env->second.has_relative_humidity) {
-                shell_printf("relative_humidity: %.2f\n",
-                              env->second.relative_humidity);
-            }
-            if (env->second.has_barometric_pressure) {
-                shell_printf("barometric_pressure: %.2f\n",
-                              env->second.barometric_pressure);
-            }
+    shell_printf("Channels: %d\n",
+                 meshroof->channels().size());
+    for (map<uint8_t, meshtastic_Channel>::const_iterator it =
+             meshroof->channels().begin();
+         it != meshroof->channels().end(); it++) {
+        if (it->second.has_settings &&
+            it->second.role != meshtastic_Channel_Role_DISABLED) {
+            shell_printf("chan#%u: %s\n",
+                         (unsigned int) it->second.index,
+                         it->second.settings.name);
         }
     }
+
+    shell_printf("Nodes: %d seen\n",
+                 meshroof->nodeInfos().size());
+    i = 0;
+    for (map<uint32_t, meshtastic_NodeInfo>::const_iterator it =
+             meshroof->nodeInfos().begin();
+         it != meshroof->nodeInfos().end(); it++, i++) {
+        if ((i % 4) == 0) {
+            shell_printf("  ");
+        }
+        shell_printf("%16s  ",
+                     meshroof->getDisplayName(it->second.num).c_str());
+        if ((i % 4) == 3) {
+            shell_printf("\n");
+        }
+    }
+    if ((i % 4) != 0) {
+        shell_printf("\n");
+    }
+
+    dev = meshroof->deviceMetrics().find(meshroof->whoami());
+    if (dev != meshroof->deviceMetrics().end()) {
+        if (dev->second.has_channel_utilization) {
+            shell_printf("channel_utilization: %.2f\n",
+                         dev->second.channel_utilization);
+        }
+        if (dev->second.has_air_util_tx) {
+            shell_printf("air_util_tx: %.2f\n",
+                         dev->second.air_util_tx);
+        }
+    }
+
+    env = meshroof->environmentMetrics().find(meshroof->whoami());
+    if (env != meshroof->environmentMetrics().end()) {
+        if (env->second.has_temperature) {
+            shell_printf("temperature: %.2f\n",
+                         env->second.temperature);
+        }
+        if (env->second.has_relative_humidity) {
+            shell_printf("relative_humidity: %.2f\n",
+                         env->second.relative_humidity);
+        }
+        if (env->second.has_barometric_pressure) {
+            shell_printf("barometric_pressure: %.2f\n",
+                         env->second.barometric_pressure);
+        }
+    }
+
+    shell_printf("mesh bytes (rx/tx): %u/%u\n",
+                 meshroof->meshDeviceBytesReceived(),
+                 meshroof->meshDeviceBytesSent());
+    shell_printf("mesh packets (rx/tx): %u/%u\n",
+                 meshroof->meshDevicePacketsReceived(),
+                 meshroof->meshDevicePacketsSent());
+    shell_printf("last mesh packet: %us ago\n",
+                 meshroof->meshDeviceLastRecivedSecondsAgo());
+
+done:
 
     return ret;
 }
@@ -618,8 +631,6 @@ done:
 void shell_init(void)
 {
     bzero(&inproc, sizeof(inproc));
-
-    shell_printf("> ");
 }
 
 int shell_process(void)
@@ -629,7 +640,7 @@ int shell_process(void)
     char c;
 
     while (usb_rx_ready() > 0) {
-        rx = usb_rx_read((uint8_t *) &c, 1);
+        rx = usb_rx_read_timeout((uint8_t *) &c, 1, pdMS_TO_TICKS(100));
         if (rx == 0) {
             break;
         }
