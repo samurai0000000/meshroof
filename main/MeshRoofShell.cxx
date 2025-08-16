@@ -199,15 +199,15 @@ int MeshRoofShell::net(int argc, char **argv)
     int ret = 0;
 
     if (argc == 1) {
-        if (meshroof->getIp() == "0.0.0.0") {
+        if (meshroof->getIp() == 0) {
             this->printf("ip: dhcp\n");
         } else {
-            this->printf("ip:      %s\n", meshroof->getIp());
-            this->printf("netmask: %s\n", meshroof->getNetmask());
-            this->printf("gateway: %s\n", meshroof->getGateway());
-            this->printf("dns1: %s\n", meshroof->getDns1());
-            this->printf("dns2: %s\n", meshroof->getDns2());
-            this->printf("dns3: %s\n", meshroof->getDns3());
+            this->printf("ip:      %s\n", meshroof->getIpString().c_str());
+            this->printf("netmask: %s\n", meshroof->getNetmaskString().c_str());
+            this->printf("gateway: %s\n", meshroof->getGatewayString().c_str());
+            this->printf("dns1:    %s\n", meshroof->getDns1String().c_str());
+            this->printf("dns2:    %s\n", meshroof->getDns2String().c_str());
+            this->printf("dns3:    %s\n", meshroof->getDns3String().c_str());
         }
     } else if ((argc == 2) && (strcmp(argv[1], "status") == 0)) {
         const esp_netif_ip_info_t *ip_info =
@@ -226,6 +226,31 @@ int MeshRoofShell::net(int argc, char **argv)
         this->printf("dns2:    " IPSTR "\n", IP2STR(&dns2_info->ip.u_addr.ip4));
         this->printf("dns3:    " IPSTR "\n", IP2STR(&dns3_info->ip.u_addr.ip4));
     } else if ((argc == 2) && (strcmp(argv[1], "apply") == 0)) {
+        meshroof->espWifi()->applyNetIf();
+        this->printf("ok\n");
+    } else if ((argc == 7) &&
+               (strcmp(argv[1], "ip") == 0) &&
+               (strcmp(argv[3], "netmask") == 0) &&
+               ((strcmp(argv[5], "gateway") == 0) ||
+                (strcmp(argv[5], "gw") == 0))) {
+        if ((meshroof->setIp(argv[2]) == true) &&
+            (meshroof->setNetmask(argv[4]) == true) &&
+            (meshroof->setGateway(argv[6]) == true) &&
+            (meshroof->saveNvm() == true)) {
+            meshroof->espWifi()->applyNetIf();
+            this->printf("ok\n");
+        } else {
+            this->printf("failed\n");
+        }
+    } else if ((argc == 3) && (strcmp(argv[1], "ip") == 0) &&
+               ((strcmp(argv[2], "dhcp") == 0))) {
+        if ((meshroof->setIp("0.0.0.0") == true) &&
+            (meshroof->saveNvm() == true)) {
+            meshroof->espWifi()->applyNetIf();
+            this->printf("ok\n");
+        } else {
+            this->printf("failed\n");
+        }
     } else if ((argc == 3) && (strcmp(argv[1], "ip") == 0)) {
         if ((meshroof->setIp(argv[2]) == true) &&
             (meshroof->saveNvm() == true)) {

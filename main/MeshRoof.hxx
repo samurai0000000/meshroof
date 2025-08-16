@@ -78,12 +78,18 @@ public:
 
     string getWifiSsid(void) const;
     string getWifiPasswd(void) const;
-    string getIp(void) const;
-    string getNetmask(void) const;
-    string getGateway(void) const;
-    string getDns1(void) const;
-    string getDns2(void) const;
-    string getDns3(void) const;
+    string getIpString(void) const;
+    string getNetmaskString(void) const;
+    string getGatewayString(void) const;
+    string getDns1String(void) const;
+    string getDns2String(void) const;
+    string getDns3String(void) const;
+    uint32_t getIp(void) const;
+    uint32_t getNetmask(void) const;
+    uint32_t getGateway(void) const;
+    uint32_t getDns1(void) const;
+    uint32_t getDns2(void) const;
+    uint32_t getDns3(void) const;
     string getNetIfPassword(void) const;
 
     bool setWifiSsid(const string &ssid);

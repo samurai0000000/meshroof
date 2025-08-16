@@ -77,7 +77,7 @@ string MeshRoof::getWifiPasswd(void) const
     return _main_body.wifi_passwd;
 }
 
-string MeshRoof::getIp(void) const
+string MeshRoof::getIpString(void) const
 {
     struct in_addr sin_addr = {
         .s_addr = _main_body.ip,
@@ -89,7 +89,7 @@ string MeshRoof::getIp(void) const
     return string(buf);
 }
 
-string MeshRoof::getNetmask(void) const
+string MeshRoof::getNetmaskString(void) const
 {
     struct in_addr sin_addr = {
         .s_addr = _main_body.netmask,
@@ -101,7 +101,7 @@ string MeshRoof::getNetmask(void) const
     return string(buf);
 }
 
-string MeshRoof::getGateway(void) const
+string MeshRoof::getGatewayString(void) const
 {
     struct in_addr sin_addr = {
         .s_addr = _main_body.gateway,
@@ -113,7 +113,7 @@ string MeshRoof::getGateway(void) const
     return string(buf);
 }
 
-string MeshRoof::getDns1(void) const
+string MeshRoof::getDns1String(void) const
 {
     struct in_addr sin_addr = {
         .s_addr = _main_body.dns1,
@@ -125,7 +125,7 @@ string MeshRoof::getDns1(void) const
     return string(buf);
 }
 
-string MeshRoof::getDns2(void) const
+string MeshRoof::getDns2String(void) const
 {
     struct in_addr sin_addr = {
         .s_addr = _main_body.dns2,
@@ -137,7 +137,7 @@ string MeshRoof::getDns2(void) const
     return string(buf);
 }
 
-string MeshRoof::getDns3(void) const
+string MeshRoof::getDns3String(void) const
 {
     struct in_addr sin_addr = {
         .s_addr = _main_body.dns3,
@@ -147,6 +147,36 @@ string MeshRoof::getDns3(void) const
     inet_ntop(AF_INET, &sin_addr, buf, sizeof(buf));
 
     return string(buf);
+}
+
+uint32_t MeshRoof::getIp(void) const
+{
+    return _main_body.ip;
+}
+
+uint32_t MeshRoof::getNetmask(void) const
+{
+    return _main_body.netmask;
+}
+
+uint32_t MeshRoof::getGateway(void) const
+{
+    return _main_body.gateway;
+}
+
+uint32_t MeshRoof::getDns1(void) const
+{
+    return _main_body.dns1;
+}
+
+uint32_t MeshRoof::getDns2(void) const
+{
+    return _main_body.dns2;
+}
+
+uint32_t MeshRoof::getDns3(void) const
+{
+    return _main_body.dns3;
 }
 
 string MeshRoof::getNetIfPassword(void) const
@@ -184,7 +214,7 @@ bool MeshRoof::setIp(const string &addr)
     struct in_addr in_addr;
 
     ret = inet_aton(addr.c_str(), &in_addr);
-    if (ret != 0) {
+    if (ret != 1) {
         return false;
     }
 
@@ -199,7 +229,7 @@ bool MeshRoof::setNetmask(const string &addr)
     struct in_addr in_addr;
 
     ret = inet_aton(addr.c_str(), &in_addr);
-    if (ret != 0) {
+    if (ret != 1) {
         return false;
     }
 
@@ -214,7 +244,7 @@ bool MeshRoof::setGateway(const string &addr)
     struct in_addr in_addr;
 
     ret = inet_aton(addr.c_str(), &in_addr);
-    if (ret != 0) {
+    if (ret != 1) {
         return false;
     }
 
@@ -229,7 +259,7 @@ bool MeshRoof::setDns1(const string &addr)
     struct in_addr in_addr;
 
     ret = inet_aton(addr.c_str(), &in_addr);
-    if (ret != 0) {
+    if (ret != 1) {
         return false;
     }
 
@@ -244,7 +274,7 @@ bool MeshRoof::setDns2(const string &addr)
     struct in_addr in_addr;
 
     ret = inet_aton(addr.c_str(), &in_addr);
-    if (ret != 0) {
+    if (ret != 1) {
         return false;
     }
 
@@ -259,7 +289,7 @@ bool MeshRoof::setDns3(const string &addr)
     struct in_addr in_addr;
 
     ret = inet_aton(addr.c_str(), &in_addr);
-    if (ret != 0) {
+    if (ret != 1) {
         return false;
     }
 

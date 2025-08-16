@@ -47,6 +47,8 @@ public:
         return &_dns3_info;
     }
 
+    void applyNetIf(void);
+
 private:
 
  	EspWifi();

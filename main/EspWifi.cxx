@@ -100,8 +100,12 @@ int EspWifi::start(void)
         ESP_LOGE(TAG, "esp_wifi_set_config ret=%d", ret);
     }
 
+    applyNetIf();
+
     esp_log_level_set("wifi", ESP_LOG_ERROR);
+    esp_log_level_set("EspWifi", ESP_LOG_ERROR);
     esp_log_level_set("esp_netif_handlers", ESP_LOG_ERROR);
+
 
     ret = esp_wifi_start();
     if (ret != ESP_OK) {
@@ -152,6 +156,57 @@ int EspWifi::getRssi(void) const
     }
 
     return rssi;
+}
+
+void EspWifi::applyNetIf(void)
+{
+    esp_err_t ret;
+    esp_netif_ip_info_t ip_info;
+    esp_netif_dns_info_t dns1_info;
+    esp_netif_dns_info_t dns2_info;
+    esp_netif_dns_info_t dns3_info;
+
+    if (meshroof->getIp() != 0) {
+        esp_netif_dhcpc_stop(_sta_netif);
+
+        ip_info.ip.addr = meshroof->getIp();
+        ip_info.netmask.addr = meshroof->getNetmask();
+        ip_info.gw.addr = meshroof->getGateway();
+        dns1_info.ip.u_addr.ip4.addr = meshroof->getDns1();
+        dns1_info.ip.type = ESP_IPADDR_TYPE_V4;
+        dns2_info.ip.u_addr.ip4.addr = meshroof->getDns2();
+        dns2_info.ip.type = ESP_IPADDR_TYPE_V4;
+        dns3_info.ip.u_addr.ip4.addr = meshroof->getDns3();
+        dns3_info.ip.type = ESP_IPADDR_TYPE_V4;
+
+        ret = esp_netif_set_ip_info(_sta_netif, &ip_info);
+        if (ret != ESP_OK) {
+            ESP_LOGE(TAG, "esp_netif_set_ip_info ret=%d", ret);
+        }
+
+        ret = esp_netif_set_dns_info(_sta_netif,
+                                     ESP_NETIF_DNS_MAIN,
+                                     &dns1_info);
+        if (ret != ESP_OK) {
+            ESP_LOGE(TAG, "esp_netif_set_dns_info ret=%d", ret);
+        }
+
+        ret = esp_netif_set_dns_info(_sta_netif,
+                                     ESP_NETIF_DNS_BACKUP,
+                                     &dns2_info);
+        if (ret != ESP_OK) {
+            ESP_LOGE(TAG, "esp_netif_set_dns_info ret=%d", ret);
+        }
+
+        ret = esp_netif_set_dns_info(_sta_netif,
+                                     ESP_NETIF_DNS_FALLBACK,
+                                     &dns3_info);
+        if (ret != ESP_OK) {
+            ESP_LOGE(TAG, "esp_netif_set_dns_info ret=%d", ret);
+        }
+    } else {
+        esp_netif_dhcpc_start(_sta_netif);
+    }
 }
 
 void EspWifi::resetStatus(void)
