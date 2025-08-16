@@ -19,6 +19,7 @@
 #include <nvs.h>
 #include <meshroof.h>
 #include <MeshRoof.hxx>
+#include <MeshRoofShell.hxx>
 #include "version.h"
 
 #define BLINK_GPIO (gpio_num_t) 21
@@ -35,6 +36,13 @@ using namespace std;
 static const char *TAG = "meshroof";
 
 shared_ptr<MeshRoof> meshroof = NULL;
+shared_ptr<MeshRoofShell> shell = NULL;
+
+string banner = "The meshroof firmware for ESP32-S3";
+string version = string("Version: ") + string(MYPROJECT_VERSION_STRING);
+string built = string("Built: ") + string(MYPROJECT_WHOAMI) + string("@") +
+    string(MYPROJECT_HOSTNAME) + string(" ") + string(MYPROJECT_DATE);
+string copyright = string("Copyright (C) 2025, Charles Chiou");
 
 void led_task(__unused void *params)
 {
@@ -58,21 +66,17 @@ void console_task(__unused void *params)
     vTaskDelay(pdMS_TO_TICKS(1000));
 
     usb_printf("\n\x1b[2K");
-    usb_printf("The meshroof firmware for ESP32-S3\n");
-    usb_printf("Version: %s\n", MYPROJECT_VERSION_STRING);
-    usb_printf("Built: %s@%s %s\n",
-               MYPROJECT_WHOAMI, MYPROJECT_HOSTNAME, MYPROJECT_DATE);
+    usb_printf("%s\n", shell->banner().c_str());
+    usb_printf("%s\n", shell->version().c_str());
+    usb_printf("%s\n", shell->built().c_str());
     usb_printf("-------------------------------------------\n");
-    usb_printf("Copyright (C) 2025, Charles Chiou\n");
+    usb_printf("%s\n", shell->copyright().c_str());
     usb_printf("> ");
 
     for (;;) {
-        while (usb_rx_ready() > 0) {
-            ret = shell_process();
-            if (ret <= 0) {
-                break;
-            }
-        }
+        do {
+            ret = shell->process();
+        } while (ret > 0);
 
         taskYIELD();
     }
@@ -146,7 +150,14 @@ extern "C" void app_main(void)
     }
     meshroof->applyNvmToHomeChat();
 
-    shell_init();
+    shell = make_shared<MeshRoofShell>();
+    shell->setBanner(banner);
+    shell->setVersion(version);
+    shell->setBuilt(built);
+    shell->setCopyright(copyright);
+    shell->setClient(meshroof);
+    shell->setNVM(meshroof);
+    shell->attach(NULL);
 
     xTaskCreatePinnedToCore(led_task,
                             "LedTask",

@@ -16,13 +16,14 @@ set(LIBMESHTASTIC_SRCS
   ${LIBMESHTASTIC_PATH}/SimpleClient.cxx
   ${LIBMESHTASTIC_PATH}/HomeChat.cxx
   ${LIBMESHTASTIC_PATH}/BaseNVM.cxx
+  ${LIBMESHTASTIC_PATH}/SimpleShell.cxx
   )
 idf_component_register(
   SRCS
   "${MESHTASTIC_PROTOS_SRCS}" "${MESHARDUINO_SRCS}" "${LIBMESHTASTIC_SRCS}"
   "serial.c"
-  "shell.cxx"
   "MeshRoof.cxx"
+  "MeshRoofShell.cxx"
   "meshroof.cxx"
   INCLUDE_DIRS "." "${LIBMESHTASTIC_PATH}" "${MESHARDUINO_PATH}"
   "${CMAKE_CURRENT_BINARY_DIR}/../../"
