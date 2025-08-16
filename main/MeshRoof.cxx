@@ -24,7 +24,7 @@ MeshRoof::MeshRoof()
     : SimpleClient(),
       HomeChat()
 {
-
+    bzero(&_main_body, sizeof(_main_body));
 }
 
 MeshRoof::~MeshRoof()

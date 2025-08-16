@@ -149,6 +149,7 @@ extern "C" void app_main(void)
         meshroof->saveNvm();  // Create a default
     }
     meshroof->applyNvmToHomeChat();
+    meshroof->espWifi()->start();
 
     shell = make_shared<MeshRoofShell>();
     shell->setBanner(banner);

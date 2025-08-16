@@ -16,7 +16,6 @@ class MeshRoofShell : public SimpleShell {
 public:
 
     MeshRoofShell(shared_ptr<SimpleClient> client = NULL);
-
     ~MeshRoofShell();
 
 protected:
@@ -27,9 +26,13 @@ protected:
 
     virtual int system(int argc, char **argv);
     virtual int reboot(int argc, char **argv);
+    virtual int nvm(int argc, char **argv);
     virtual int wcfg(int argc, char **argv);
     virtual int disc(int argc, char **argv);
     virtual int hb(int argc, char **argv);
+    virtual int wifi(int argc, char **argv);
+    virtual int net(int argc, char **argv);
+    virtual int ping(int argc, char **argv);
     virtual int unknown_command(int argc, char **argv);
 
 };

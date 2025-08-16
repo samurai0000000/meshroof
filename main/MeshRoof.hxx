@@ -11,6 +11,7 @@
 #include <SimpleClient.hxx>
 #include <HomeChat.hxx>
 #include <BaseNVM.hxx>
+#include <EspWifi.hxx>
 
 using namespace std;
 
@@ -53,6 +54,10 @@ public:
 
     MeshRoof();
     ~MeshRoof();
+
+    inline shared_ptr<EspWifi> espWifi(void) {
+        return EspWifi::getInstance();
+    }
 
 protected:
 

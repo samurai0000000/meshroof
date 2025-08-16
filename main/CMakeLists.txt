@@ -24,6 +24,7 @@ idf_component_register(
   "serial.c"
   "MeshRoof.cxx"
   "MeshRoofShell.cxx"
+  "EspWifi.cxx"
   "meshroof.cxx"
   INCLUDE_DIRS "." "${LIBMESHTASTIC_PATH}" "${MESHARDUINO_PATH}"
   "${CMAKE_CURRENT_BINARY_DIR}/../../"

@@ -9,7 +9,7 @@ set(IDF_TARGET esp32s3)
 include($ENV{IDF_PATH}/tools/cmake/project.cmake)
 idf_build_set_property(MINIMAL_BUILD ON)
 
-project(meshroof VERSION 1.3.2 LANGUAGES C CXX ASM)
+project(meshroof VERSION 1.4.0 LANGUAGES C CXX ASM)
 
 set(WHOAMI_OUTPUT)
 execute_process(
