@@ -13,6 +13,7 @@ typedef struct uart_inst uart_inst_t;
 
 extern void serial_init(void);
 
+extern int usb_tx_write(const uint8_t *data, size_t size);
 extern int usb_printf(const char *format, ...);
 extern int usb_vprintf(const char *format, va_list ap);
 extern int usb_rx_ready(void);

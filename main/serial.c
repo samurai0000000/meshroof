@@ -87,6 +87,11 @@ done:
     return;
 }
 
+int usb_tx_write(const uint8_t *data, size_t size)
+{
+    return usb_serial_jtag_write_bytes(data, size, 0);
+}
+
 int usb_printf(const char *format, ...)
 {
     int ret = 0;

@@ -8,10 +8,14 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <driver/gpio.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
 #include <memory>
 #include <iostream>
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
+#include <freertos/queue.h>
 #include <driver/usb_serial_jtag.h>
 #include <esp_timer.h>
 #include <esp_log.h>
@@ -28,6 +32,10 @@
 #define LED_TASK_PRIORITY              (tskIDLE_PRIORITY + 1UL)
 #define CONSOLE_TASK_STACK_SIZE        (4 * 1024)
 #define CONSOLE_TASK_PRIORITY          (tskIDLE_PRIORITY + 2UL)
+#define TCP_CONSOLE_TASK_STACK_SIZE    (4 * 1024)
+#define TCP_CONSOLE_TASK_PRIORITY      (tskIDLE_PRIORITY + 3UL)
+#define BINDER_TASK_STACK_SIZE         (2 * 1024)
+#define BINDER_TASK_PRIORITY           (tskIDLE_PRIORITY + 4UL)
 
 extern void serial_init(void);
 
@@ -36,15 +44,18 @@ using namespace std;
 static const char *TAG = "meshroof";
 
 shared_ptr<MeshRoof> meshroof = NULL;
-shared_ptr<MeshRoofShell> shell = NULL;
+static shared_ptr<MeshRoofShell> shell = NULL;
+static shared_ptr<MeshRoofShell> shell2 = NULL;
+static QueueHandle_t queue = NULL;
 
-string banner = "The meshroof firmware for ESP32-S3";
-string version = string("Version: ") + string(MYPROJECT_VERSION_STRING);
-string built = string("Built: ") + string(MYPROJECT_WHOAMI) + string("@") +
+static string banner = "The meshroof firmware for ESP32-S3";
+static string version = string("Version: ") + string(MYPROJECT_VERSION_STRING);
+static string built = string("Built: ") +
+    string(MYPROJECT_WHOAMI) + string("@") +
     string(MYPROJECT_HOSTNAME) + string(" ") + string(MYPROJECT_DATE);
-string copyright = string("Copyright (C) 2025, Charles Chiou");
+static string copyright = string("Copyright (C) 2025, Charles Chiou");
 
-void led_task(__unused void *params)
+static void led_task(__unused void *params)
 {
     bool led_on = false;
 
@@ -59,7 +70,7 @@ void led_task(__unused void *params)
     }
 }
 
-void console_task(__unused void *params)
+static void console_task(__unused void *params)
 {
     int ret;
 
@@ -82,7 +93,100 @@ void console_task(__unused void *params)
     }
 }
 
-void meshtastic_task(__unused void *params)
+static int tcp_fd = -1;
+
+static void tcp_console_task(__unused void *params)
+{
+    int ret;
+
+    for (;;) {
+        if (tcp_fd == -1) {
+            ret = xQueueReceive(queue, &tcp_fd, portMAX_DELAY);
+            if ((ret == pdPASS) && (tcp_fd > 0)) {
+                uint32_t ctx = 0x80000000 | tcp_fd;
+                shell2->attach((void *) ctx, true);
+            }
+            continue;
+        }
+
+        ret = shell2->process();
+        if (ret < 0) {
+            shell2->detach();
+            close(tcp_fd);
+            tcp_fd = -1;
+        }
+
+        taskYIELD();
+    }
+}
+
+static void binder_task(__unused void *params)
+{
+    int ret;
+    int server_sock = -1;
+    int client_sock = -1;
+    struct sockaddr_in addr;
+    socklen_t len;
+    static const string msg = "Too many connected clients, bye!\n";
+
+    server_sock = socket(AF_INET, SOCK_STREAM, 0);
+    if (server_sock == -1) {
+        ESP_LOGE(TAG, "socket ret=%d", server_sock);
+        goto done;
+    }
+
+    addr.sin_family = AF_INET;
+    addr.sin_addr.s_addr = htonl(INADDR_ANY);
+    addr.sin_port = htons(16876);
+
+    ret = bind(server_sock, (struct sockaddr *) &addr, sizeof(addr));
+    if (ret != 0) {
+        ESP_LOGE(TAG, "bind ret=%d", bind);
+        goto done;
+    }
+
+    ret = listen(server_sock, 1);
+    if (ret == -1) {
+        ESP_LOGE(TAG, "listen ret=%d", ret);
+        goto done;
+    }
+
+    for (;;) {
+        len = sizeof(addr);
+        client_sock = accept(server_sock, (struct sockaddr *) &addr, &len);
+        if (client_sock == -1) {
+            ESP_LOGE(TAG, "accpet ret=%d\n", client_sock);
+            vTaskDelay(pdMS_TO_TICKS(1000));
+            continue;
+        }
+
+        if (tcp_fd != -1) {
+            write(client_sock, msg.c_str(), msg.size());
+            close(client_sock);
+            client_sock = -1;
+        } else {
+            ret = xQueueSend(queue, &client_sock, 0);
+            if (ret != pdPASS) {
+                write(client_sock, msg.c_str(), msg.size());
+                close(client_sock);
+                client_sock = -1;
+            }
+        }
+    }
+
+done:
+
+    if (server_sock != -1) {
+        close(server_sock);
+    }
+
+    for (;;) {
+        ESP_LOGE(TAG, "binder_task is dead");
+        vTaskDelay(pdMS_TO_TICKS(60000));
+    }
+}
+
+static void meshtastic_task(__unused void *params)
 {
     int ret;
     time_t now, last_want_config, last_heartbeat;
@@ -160,19 +264,53 @@ extern "C" void app_main(void)
     shell->setNVM(meshroof);
     shell->attach(NULL);
 
+    shell2 = make_shared<MeshRoofShell>();
+    shell2->setBanner(banner);
+    shell2->setVersion(version);
+    shell2->setBuilt(built);
+    shell2->setCopyright(copyright);
+    shell2->setClient(meshroof);
+    shell2->setNVM(meshroof);
+    shell2->attach(NULL);
+    shell2->setNoEcho(true);
+
+    struct vprintf_callback cb = {
+        .ctx = shell2.get(),
+        .vprintf = SimpleShell::ctx_vprintf,
+    };
+    meshroof->addPrintfCallback(cb);
+
+    queue = xQueueCreate(1, sizeof(int));
+
     xTaskCreatePinnedToCore(led_task,
                             "LedTask",
                             LED_TASK_STACK_SIZE,
                             NULL,
                             LED_TASK_PRIORITY,
                             NULL,
-                            1);
+                            0);
 
     xTaskCreatePinnedToCore(console_task,
                             "ConsoleTask",
                             CONSOLE_TASK_STACK_SIZE,
                             NULL,
                             CONSOLE_TASK_PRIORITY,
+                            NULL,
+                            1);
+
+    xTaskCreatePinnedToCore(tcp_console_task,
+                            "TcpConsoleTask",
+                            TCP_CONSOLE_TASK_STACK_SIZE,
+                            NULL,
+                            TCP_CONSOLE_TASK_PRIORITY,
+                            NULL,
+                            1);
+
+    xTaskCreatePinnedToCore(binder_task,
+                            "BinderTask",
+                            BINDER_TASK_STACK_SIZE,
+                            NULL,
+                            BINDER_TASK_PRIORITY,
                             NULL,
                             1);
 
