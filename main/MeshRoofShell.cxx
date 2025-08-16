@@ -19,6 +19,7 @@ extern shared_ptr<MeshRoof> meshroof;
 MeshRoofShell::MeshRoofShell(shared_ptr<SimpleClient> client)
     : SimpleShell(client)
 {
+    _help_list.push_back("exit");
     _help_list.push_back("wcfg");
     _help_list.push_back("disc");
     _help_list.push_back("hb");
@@ -156,6 +157,18 @@ int MeshRoofShell::nvm(int argc, char **argv)
     wifi(argc, argv);
     net(argc, argv);
     SimpleShell::nvm(argc, argv);
+
+    return 0;
+}
+
+int MeshRoofShell::exit(int argc, char **argv)
+{
+    uint32_t ctx = (uint32_t) _ctx;
+
+    if (ctx != 0) {
+        int tcp_fd = (ctx & 0x7fffffff);
+        close(tcp_fd);
+    }
 
     return 0;
 }
@@ -385,7 +398,9 @@ int MeshRoofShell::unknown_command(int argc, char **argv)
 {
     int ret = 0;
 
-    if (strcmp(argv[0], "wcfg") == 0) {
+    if (strcmp(argv[0], "exit") == 0) {
+        ret = this->exit(argc, argv);
+    } else if (strcmp(argv[0], "wcfg") == 0) {
         ret = this->wcfg(argc, argv);
     } else if (strcmp(argv[0], "disc") == 0) {
         ret = this->disc(argc, argv);
