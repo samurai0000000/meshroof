@@ -107,8 +107,13 @@ int usb_printf(const char *format, ...)
 int usb_vprintf(const char *format, va_list ap)
 {
     int ret = 0;
-    char pbuf[SERIAL_PBUF_SIZE];
+    char *pbuf = NULL;
     int i;
+
+    pbuf = (char *) malloc(SERIAL_PBUF_SIZE);
+    if (pbuf == NULL) {
+        goto done;
+    }
 
     ret = vsnprintf(pbuf, SERIAL_PBUF_SIZE - 1, format, ap);
 
@@ -117,6 +122,12 @@ int usb_vprintf(const char *format, va_list ap)
             while (usb_serial_jtag_write_bytes("\r", 1, 0) != 1);
         }
         while (usb_serial_jtag_write_bytes(pbuf + i, 1, 0) != 1);
+    }
+
+done:
+
+    if (pbuf) {
+        free(pbuf);
     }
 
     return ret;

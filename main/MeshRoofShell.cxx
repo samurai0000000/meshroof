@@ -7,6 +7,9 @@
 #include <esp_timer.h>
 #include <esp_system.h>
 #include <esp_heap_caps.h>
+#include <lwip/ip_addr.h>
+#include <lwip/inet.h>
+#include <lwip/netdb.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 #include <libmeshtastic.h>
@@ -53,6 +56,7 @@ int MeshRoofShell::printf(const char *format, ...)
     int ret = 0;
     uint32_t ctx = (uint32_t) _ctx;
     va_list ap;
+    char *buf = NULL;
 
     if (ctx == 0) {
         va_start(ap, format);
@@ -60,12 +64,16 @@ int MeshRoofShell::printf(const char *format, ...)
         va_end(ap);
     } else {
         int tcp_fd = (ctx & 0x7fffffff);
-        char buf[512];
         char *s = NULL;
         int len = 0;
 
+        buf = (char *) malloc(512);
+        if (buf == NULL) {
+            goto done;
+        }
+
         va_start(ap, format);
-        len = vsnprintf(buf, sizeof(buf) - 1, format, ap);
+        len = vsnprintf(buf, 512 - 1, format, ap);
         va_end(ap);
 
         s = buf;
@@ -79,6 +87,12 @@ int MeshRoofShell::printf(const char *format, ...)
             len -= ret;
             s += len;
         }
+    }
+
+done:
+
+    if (buf) {
+        free(buf);
     }
 
     return ret;
@@ -384,12 +398,158 @@ int MeshRoofShell::net(int argc, char **argv)
     return ret;
 }
 
+void MeshRoofShell::on_ping_success(esp_ping_handle_t hdl, void *args)
+{
+    MeshRoofShell *mrs = (MeshRoofShell *) args;
+    uint8_t ttl;
+    uint16_t seqno;
+    uint32_t elapsed_time, recv_len;
+    esp_ip_addr_t target_addr;
+
+    esp_ping_get_profile(hdl, ESP_PING_PROF_SEQNO, &seqno, sizeof(seqno));
+    esp_ping_get_profile(hdl, ESP_PING_PROF_TTL, &ttl, sizeof(ttl));
+    esp_ping_get_profile(hdl, ESP_PING_PROF_IPADDR,
+                         &target_addr, sizeof(target_addr));
+    esp_ping_get_profile(hdl, ESP_PING_PROF_SIZE, &recv_len, sizeof(recv_len));
+    esp_ping_get_profile(hdl, ESP_PING_PROF_TIMEGAP,
+                         &elapsed_time, sizeof(elapsed_time));
+    mrs->printf("%d bytes from %s icmp_seq=%d ttl=%d time=%d ms\n",
+                recv_len, inet_ntoa(target_addr.u_addr.ip4), seqno,
+                ttl, elapsed_time);
+}
+
+void MeshRoofShell::on_ping_timeout(esp_ping_handle_t hdl, void *args)
+{
+    MeshRoofShell *mrs = (MeshRoofShell *) args;
+    uint16_t seqno = 0;
+    esp_ip_addr_t target_addr;
+
+    esp_ping_get_profile(hdl, ESP_PING_PROF_SEQNO, &seqno, sizeof(seqno));
+    esp_ping_get_profile(hdl, ESP_PING_PROF_IPADDR,
+                         &target_addr, sizeof(target_addr));
+    mrs->printf("From %s icmp_seq=%d timeout\n",
+                inet_ntoa(target_addr.u_addr.ip4), seqno);
+}
+
+void MeshRoofShell::on_ping_end(esp_ping_handle_t hdl, void *args)
+{
+    MeshRoofShell *mrs = (MeshRoofShell *) args;
+    uint32_t transmitted;
+    uint32_t received;
+    uint32_t total_time_ms;
+
+    esp_ping_get_profile(hdl, ESP_PING_PROF_REQUEST,
+                         &transmitted, sizeof(transmitted));
+    esp_ping_get_profile(hdl, ESP_PING_PROF_REPLY,
+                         &received, sizeof(received));
+    esp_ping_get_profile(hdl, ESP_PING_PROF_DURATION,
+                         &total_time_ms, sizeof(total_time_ms));
+    mrs->printf("%d packets transmitted, %d received, time %dms\n",
+                transmitted, received, total_time_ms);
+}
+
 int MeshRoofShell::ping(int argc, char **argv)
 {
     int ret = 0;
+    ip_addr_t target_addr;
+    struct addrinfo hint;
+    struct addrinfo *res = NULL;
+    struct in_addr addr4;
+    esp_ping_config_t ping_config;
+    esp_ping_callbacks_t cbs;
+    esp_ping_handle_t hdl = NULL;
 
-    (void)(argc);
-    (void)(argv);
+    if (argc == 1) {
+        goto done;
+    } else if (argc > 3) {
+        ret = -1;
+        this->printf("syntax error!\n");
+        goto done;
+    }
+
+    memset(&hint, 0, sizeof(hint));
+    memset(&target_addr, 0, sizeof(target_addr));
+    ret = getaddrinfo(argv[1], NULL, &hint, &res);
+    if (ret != 0) {
+        this->printf("cannot resolve %s!\n", argv[1]);
+        goto done;
+    }
+
+    addr4 = ((struct sockaddr_in *) (res->ai_addr))->sin_addr;
+    inet_addr_to_ip4addr(ip_2_ip4(&target_addr), &addr4);
+    if (res) {
+        freeaddrinfo(res);
+        res = NULL;
+    }
+
+    ping_config = ESP_PING_DEFAULT_CONFIG();
+    ping_config.target_addr = target_addr;
+    ping_config.count = ESP_PING_COUNT_INFINITE;
+
+    cbs.on_ping_success = on_ping_success;
+    cbs.on_ping_timeout = on_ping_timeout;
+    cbs.on_ping_end = on_ping_end;
+    cbs.cb_args = this;
+
+    ret = esp_ping_new_session(&ping_config, &cbs, &hdl);
+    if (ret != ESP_OK) {
+        ret = -1;
+        this->printf("esp_ping_new_session failed!\n");
+        goto done;
+    }
+
+    ret = esp_ping_start(hdl);
+    if (ret != ESP_OK) {
+        ret = -1;
+        this->printf("esp_ping_start failed!\n");
+        goto done;
+    }
+
+    for (;;) {
+        char c;
+
+        ret = this->rx_read((uint8_t *) &c, 1);
+        if (ret == -1) {
+            break;
+        }
+
+        if (c == 0xff) {  // IAC received
+            static const uint8_t iac_do_tm[3] = { 0xff, 0xfd, 0x06};
+            static const uint8_t iac_will_tm[3] = { 0xff, 0xfb, 0x06};
+            char iac2;
+
+            ret = this->rx_read((uint8_t *) &iac2, 1);
+            if (ret == 1) {
+                switch (iac2) {
+                case 0xf4:  // IAC IP (interrupt process)
+                    ret = this->tx_write(iac_do_tm, sizeof(iac_do_tm));
+                    ret = this->tx_write(iac_will_tm, sizeof(iac_will_tm));
+                    this->printf("\n> ");
+                    _inproc.i = 0;
+                    break;
+                default:
+                    break;
+                }
+            }
+
+            break;
+        }
+
+        if (c == '\x03') {
+            break;
+        }
+    }
+
+    esp_ping_stop(hdl);
+
+    ret = 0;
+
+done:
+
+    if (hdl) {
+        vTaskDelay(pdMS_TO_TICKS(3000));
+        esp_ping_delete_session(hdl);
+    }
 
     return ret;
 }

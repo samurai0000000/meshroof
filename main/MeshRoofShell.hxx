@@ -7,6 +7,7 @@
 #ifndef MESHROOFSHELL_HXX
 #define MESHROOFSHELL_HXX
 
+#include <ping/ping_sock.h>
 #include <SimpleShell.hxx>
 
 using namespace std;
@@ -34,6 +35,9 @@ protected:
     virtual int hb(int argc, char **argv);
     virtual int wifi(int argc, char **argv);
     virtual int net(int argc, char **argv);
+    static void on_ping_success(esp_ping_handle_t hdl, void *args);
+    static void on_ping_timeout(esp_ping_handle_t hdl, void *args);
+    static void on_ping_end(esp_ping_handle_t hdl, void *args);
     virtual int ping(int argc, char **argv);
     virtual int unknown_command(int argc, char **argv);
 
