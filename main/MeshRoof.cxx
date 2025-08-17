@@ -14,6 +14,8 @@
 #include <esp_log.h>
 #include <nvs_flash.h>
 #include <nvs.h>
+#include <sstream>
+#include <iomanip>
 #include <algorithm>
 #include <meshroof.h>
 #include <MeshRoof.hxx>
@@ -60,6 +62,127 @@ void MeshRoof::gotTraceRoute(const meshtastic_MeshPacket &packet,
                              const meshtastic_RouteDiscovery &routeDiscovery)
 {
     SimpleClient::gotTraceRoute(packet, routeDiscovery);
+}
+
+string MeshRoof::handleUnknown(uint32_t node_num, const string &_message,
+                               bool isAdmin, bool isMate)
+{
+    string reply;
+    string message = _message;
+    string first_word;
+
+    (void)(node_num);
+
+    // get first word
+    first_word = message.substr(0, message.find(' '));
+    message = message.substr(first_word.size());
+
+    // trim white spaces and punct (front)
+    message.erase(message.begin(),
+                  find_if(message.begin(), message.end(),
+                          [](unsigned char ch) {
+                              return !isspace(ch) && !ispunct(ch);
+                          }));
+    // trim white space and punct (back)
+    message.erase(find_if(message.rbegin(), message.rend(),
+                          [](unsigned char ch) {
+                              return !isspace(ch) && !ispunct(ch);
+                          }).base(), message.end());
+
+    if (first_word == "wifi") {
+        reply = handleWifi(node_num, message, isAdmin, isMate);
+    } else if (first_word == "net") {
+        reply = handleNet(node_num, message, isAdmin, isMate);
+    }
+
+    return reply;
+}
+
+string MeshRoof::handleWifi(uint32_t node_num, const string &message,
+                            bool isAdmin, bool isMate)
+{
+    stringstream ss;
+    const wifi_event_sta_connected_t *sta_connected =
+        espWifi()->getStaConnected();
+
+    (void)(node_num);
+
+    if (!isAdmin && !isMate) {
+        goto done;
+    }
+
+    if (sta_connected->bssid[0] == 0x0) {
+        ss << "Wifi not connected";
+    } else {
+        char buf[40];
+
+        bzero(buf, sizeof(buf));
+        memcpy(buf, sta_connected->ssid,
+               min((size_t) sta_connected->ssid_len, sizeof(buf)));
+        ss << "Wifi is connected" << endl;
+        ss << "ssid: " << buf << endl;
+        snprintf(buf, sizeof(buf) - 1,
+                 "bssid: %.2x:%.2x:%.2x:%.2x:%.2x:%.2x",
+                 sta_connected->bssid[0],
+                 sta_connected->bssid[1],
+                 sta_connected->bssid[2],
+                 sta_connected->bssid[3],
+                 sta_connected->bssid[4],
+                 sta_connected->bssid[5]);
+        ss << buf << endl;
+        ss << "channel: " << (int) sta_connected->channel << endl;
+        ss << "rssi: " << espWifi()->getRssi();
+    }
+
+done:
+
+    return ss.str();
+}
+
+string MeshRoof::handleNet(uint32_t node_num, const string &message,
+                           bool isAdmin, bool isMate)
+{
+    stringstream ss;
+    const esp_netif_ip_info_t *ip_info = espWifi()->getIpInfo();
+    const esp_netif_dns_info_t *dns1_info = espWifi()->getDns1Info();
+    const esp_netif_dns_info_t *dns2_info = espWifi()->getDns2Info();
+    const esp_netif_dns_info_t *dns3_info = espWifi()->getDns3Info();
+    char buf[80];
+
+    (void)(node_num);
+
+    if (!isAdmin && !isMate) {
+        goto done;
+    }
+
+    if (getIp() == 0) {
+        this->printf("(dhcp)\n");
+    } else {
+        this->printf("(static ip)\n");
+    }
+
+    snprintf(buf, sizeof(buf) - 1,
+             "ip:      " IPSTR, IP2STR(&ip_info->ip));
+    ss << buf << endl;
+    snprintf(buf, sizeof(buf) - 1,
+             "netmask: " IPSTR, IP2STR(&ip_info->netmask));
+    ss << buf << endl;
+    snprintf(buf, sizeof(buf) - 1,
+             "gateway: " IPSTR, IP2STR(&ip_info->gw));
+    ss << buf << endl;
+    snprintf(buf, sizeof(buf) - 1,
+             "dns1:    " IPSTR, IP2STR(&dns1_info->ip.u_addr.ip4));
+    ss << buf << endl;
+    snprintf(buf, sizeof(buf) - 1,
+             "dns2:    " IPSTR, IP2STR(&dns2_info->ip.u_addr.ip4));
+    ss << buf << endl;
+    snprintf(buf, sizeof(buf) - 1,
+             "dns3:    " IPSTR, IP2STR(&dns3_info->ip.u_addr.ip4));
+    ss << buf;
+
+done:
+
+    return ss.str();
 }
 
 int MeshRoof::vprintf(const char *format, va_list ap) const

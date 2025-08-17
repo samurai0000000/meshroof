@@ -61,6 +61,8 @@ public:
 
 protected:
 
+    // Extend SimpleClient
+
     virtual void gotTextMessage(const meshtastic_MeshPacket &packet,
                                 const string &message);
     virtual void gotTelemetry(const meshtastic_MeshPacket &packet,
@@ -72,6 +74,14 @@ protected:
 
 protected:
 
+    // Extend HomeChat
+
+    virtual string handleUnknown(uint32_t node_num, const string &message,
+                                 bool isAdmin, bool isMate);
+    virtual string handleWifi(uint32_t node_num, const string &message,
+                              bool isAdmin, bool isMate);
+    virtual string handleNet(uint32_t node_num, const string &message,
+                             bool isAdmin, bool isMate);
     virtual int vprintf(const char *format, va_list ap) const;
 
 public:

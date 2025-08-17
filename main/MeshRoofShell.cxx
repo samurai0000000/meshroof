@@ -41,7 +41,7 @@ int MeshRoofShell::tx_write(const uint8_t *buf, size_t size)
     int ret = 0;
     uint32_t ctx = (uint32_t) _ctx;
 
-    if (ctx == 0) {
+    if (ctx == 1) {
         ret = usb_tx_write(buf, size);
     } else {
         int tcp_fd = (ctx & 0x7fffffff);
@@ -58,7 +58,7 @@ int MeshRoofShell::printf(const char *format, ...)
     va_list ap;
     char *buf = NULL;
 
-    if (ctx == 0) {
+    if (ctx == 1) {
         va_start(ap, format);
         ret = usb_vprintf(format, ap);
         va_end(ap);
@@ -103,7 +103,7 @@ int MeshRoofShell::rx_ready(void) const
     int ret = 0;
     uint32_t ctx = (uint32_t) _ctx;
 
-    if (ctx == 0) {
+    if (ctx == 1) {
         ret = usb_rx_ready();
     } else {
         ret = 1;
@@ -117,7 +117,7 @@ int MeshRoofShell::rx_read(uint8_t *buf, size_t size)
     int ret = 0;
     uint32_t ctx = (uint32_t) _ctx;
 
-    if (ctx == 0) {
+    if (ctx == 1) {
         ret = usb_rx_read_timeout(buf, size, pdMS_TO_TICKS(100));
     } else {
         int tcp_fd = (ctx & 0x7fffffff);
@@ -179,7 +179,7 @@ int MeshRoofShell::exit(int argc, char **argv)
 {
     uint32_t ctx = (uint32_t) _ctx;
 
-    if (ctx != 0) {
+    if (ctx != 1) {
         int tcp_fd = (ctx & 0x7fffffff);
         close(tcp_fd);
     }
@@ -238,9 +238,6 @@ int MeshRoofShell::wifi(int argc, char **argv)
     shared_ptr<EspWifi> wifi = meshroof->espWifi();
 
     if (argc == 1) {
-        this->printf("ssid: %s\n", meshroof->getWifiSsid().c_str());
-        this->printf("passwd: %s\n", meshroof->getWifiPasswd().c_str());
-    } else if ((argc == 2) && (strcmp(argv[1], "status") == 0)) {
         const wifi_event_sta_connected_t *sta_connected =
             meshroof->espWifi()->getStaConnected();
         if (sta_connected->bssid[0] == 0x0) {
@@ -262,6 +259,9 @@ int MeshRoofShell::wifi(int argc, char **argv)
             this->printf("channel: %d\n", (int) sta_connected->channel);
             this->printf("rssi: %d\n", meshroof->espWifi()->getRssi());
         }
+    } else if ((argc == 2) && (strcmp(argv[1], "nvm") == 0)) {
+        this->printf("ssid: %s\n", meshroof->getWifiSsid().c_str());
+        this->printf("passwd: %s\n", meshroof->getWifiPasswd().c_str());
     } else if ((argc == 2) && (strcmp(argv[1], "stop") == 0)) {
         meshroof->espWifi()->stop();
     } else if ((argc == 2) && (strcmp(argv[1], "start") == 0)) {
@@ -297,6 +297,27 @@ int MeshRoofShell::net(int argc, char **argv)
     int ret = 0;
 
     if (argc == 1) {
+        const esp_netif_ip_info_t *ip_info =
+            meshroof->espWifi()->getIpInfo();
+        const esp_netif_dns_info_t *dns1_info =
+            meshroof->espWifi()->getDns1Info();
+        const esp_netif_dns_info_t *dns2_info =
+            meshroof->espWifi()->getDns2Info();
+        const esp_netif_dns_info_t *dns3_info =
+            meshroof->espWifi()->getDns3Info();
+
+        if (meshroof->getIp() == 0) {
+            this->printf("(dhcp)\n");
+        } else {
+            this->printf("(static ip)\n");
+        }
+        this->printf("ip:      " IPSTR "\n", IP2STR(&ip_info->ip));
+        this->printf("netmask: " IPSTR "\n", IP2STR(&ip_info->netmask));
+        this->printf("gateway: " IPSTR "\n", IP2STR(&ip_info->gw));
+        this->printf("dns1:    " IPSTR "\n", IP2STR(&dns1_info->ip.u_addr.ip4));
+        this->printf("dns2:    " IPSTR "\n", IP2STR(&dns2_info->ip.u_addr.ip4));
+        this->printf("dns3:    " IPSTR "\n", IP2STR(&dns3_info->ip.u_addr.ip4));
+    } else if ((argc == 2) && (strcmp(argv[1], "nvm") == 0)) {
         if (meshroof->getIp() == 0) {
             this->printf("ip: dhcp\n");
         } else {
@@ -307,22 +328,6 @@ int MeshRoofShell::net(int argc, char **argv)
             this->printf("dns2:    %s\n", meshroof->getDns2String().c_str());
             this->printf("dns3:    %s\n", meshroof->getDns3String().c_str());
         }
-    } else if ((argc == 2) && (strcmp(argv[1], "status") == 0)) {
-        const esp_netif_ip_info_t *ip_info =
-            meshroof->espWifi()->getIpInfo();
-        const esp_netif_dns_info_t *dns1_info =
-            meshroof->espWifi()->getDns1Info();
-        const esp_netif_dns_info_t *dns2_info =
-            meshroof->espWifi()->getDns2Info();
-        const esp_netif_dns_info_t *dns3_info =
-            meshroof->espWifi()->getDns3Info();
-
-        this->printf("ip:      " IPSTR "\n", IP2STR(&ip_info->ip));
-        this->printf("netmask: " IPSTR "\n", IP2STR(&ip_info->netmask));
-        this->printf("gateway: " IPSTR "\n", IP2STR(&ip_info->gw));
-        this->printf("dns1:    " IPSTR "\n", IP2STR(&dns1_info->ip.u_addr.ip4));
-        this->printf("dns2:    " IPSTR "\n", IP2STR(&dns2_info->ip.u_addr.ip4));
-        this->printf("dns3:    " IPSTR "\n", IP2STR(&dns3_info->ip.u_addr.ip4));
     } else if ((argc == 2) && (strcmp(argv[1], "apply") == 0)) {
         meshroof->espWifi()->applyNetIf();
         this->printf("ok\n");

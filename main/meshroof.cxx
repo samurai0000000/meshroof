@@ -262,7 +262,7 @@ extern "C" void app_main(void)
     shell->setCopyright(copyright);
     shell->setClient(meshroof);
     shell->setNVM(meshroof);
-    shell->attach(NULL);
+    shell->attach((void *) 1);
 
     shell2 = make_shared<MeshRoofShell>();
     shell2->setBanner(banner);
@@ -271,7 +271,7 @@ extern "C" void app_main(void)
     shell2->setCopyright(copyright);
     shell2->setClient(meshroof);
     shell2->setNVM(meshroof);
-    shell2->attach(NULL);
+    shell2->attach((void *) 0);
     shell2->setNoEcho(true);
 
     struct vprintf_callback cb = {
