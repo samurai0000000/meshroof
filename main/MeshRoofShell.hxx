@@ -30,9 +30,6 @@ protected:
     virtual int reboot(int argc, char **argv);
     virtual int nvm(int argc, char **argv);
     virtual int exit(int argc, char **argv);
-    virtual int wcfg(int argc, char **argv);
-    virtual int disc(int argc, char **argv);
-    virtual int hb(int argc, char **argv);
     virtual int wifi(int argc, char **argv);
     virtual int net(int argc, char **argv);
     static void on_ping_success(esp_ping_handle_t hdl, void *args);

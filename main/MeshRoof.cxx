@@ -64,52 +64,34 @@ void MeshRoof::gotTraceRoute(const meshtastic_MeshPacket &packet,
     SimpleClient::gotTraceRoute(packet, routeDiscovery);
 }
 
-string MeshRoof::handleUnknown(uint32_t node_num, const string &_message,
-                               bool isAdmin, bool isMate)
+string MeshRoof::handleUnknown(uint32_t node_num, string &message)
 {
     string reply;
-    string message = _message;
     string first_word;
 
     (void)(node_num);
 
-    // get first word
     first_word = message.substr(0, message.find(' '));
+    toLowercase(first_word);
     message = message.substr(first_word.size());
-
-    // trim white spaces and punct (front)
-    message.erase(message.begin(),
-                  find_if(message.begin(), message.end(),
-                          [](unsigned char ch) {
-                              return !isspace(ch) && !ispunct(ch);
-                          }));
-    // trim white space and punct (back)
-    message.erase(find_if(message.rbegin(), message.rend(),
-                          [](unsigned char ch) {
-                              return !isspace(ch) && !ispunct(ch);
-                          }).base(), message.end());
+    trimWhitespace(message);
 
     if (first_word == "wifi") {
-        reply = handleWifi(node_num, message, isAdmin, isMate);
+        reply = handleWifi(node_num, message);
     } else if (first_word == "net") {
-        reply = handleNet(node_num, message, isAdmin, isMate);
+        reply = handleNet(node_num, message);
     }
 
     return reply;
 }
 
-string MeshRoof::handleWifi(uint32_t node_num, const string &message,
-                            bool isAdmin, bool isMate)
+string MeshRoof::handleWifi(uint32_t node_num, string &message)
 {
     stringstream ss;
     const wifi_event_sta_connected_t *sta_connected =
         espWifi()->getStaConnected();
 
     (void)(node_num);
-
-    if (!isAdmin && !isMate) {
-        goto done;
-    }
 
     if (sta_connected->bssid[0] == 0x0) {
         ss << "Wifi not connected";
@@ -134,13 +116,10 @@ string MeshRoof::handleWifi(uint32_t node_num, const string &message,
         ss << "rssi: " << espWifi()->getRssi();
     }
 
-done:
-
     return ss.str();
 }
 
-string MeshRoof::handleNet(uint32_t node_num, const string &message,
-                           bool isAdmin, bool isMate)
+string MeshRoof::handleNet(uint32_t node_num, string &message)
 {
     stringstream ss;
     const esp_netif_ip_info_t *ip_info = espWifi()->getIpInfo();
@@ -150,10 +129,6 @@ string MeshRoof::handleNet(uint32_t node_num, const string &message,
     char buf[80];
 
     (void)(node_num);
-
-    if (!isAdmin && !isMate) {
-        goto done;
-    }
 
     if (getIp() == 0) {
         this->printf("(dhcp)\n");
@@ -179,8 +154,6 @@ string MeshRoof::handleNet(uint32_t node_num, const string &message,
     snprintf(buf, sizeof(buf) - 1,
              "dns3:    " IPSTR, IP2STR(&dns3_info->ip.u_addr.ip4));
     ss << buf;
-
-done:
 
     return ss.str();
 }

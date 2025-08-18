@@ -76,12 +76,9 @@ protected:
 
     // Extend HomeChat
 
-    virtual string handleUnknown(uint32_t node_num, const string &message,
-                                 bool isAdmin, bool isMate);
-    virtual string handleWifi(uint32_t node_num, const string &message,
-                              bool isAdmin, bool isMate);
-    virtual string handleNet(uint32_t node_num, const string &message,
-                             bool isAdmin, bool isMate);
+    virtual string handleUnknown(uint32_t node_num, string &message);
+    virtual string handleWifi(uint32_t node_num, string &message);
+    virtual string handleNet(uint32_t node_num, string &message);
     virtual int vprintf(const char *format, va_list ap) const;
 
 public:

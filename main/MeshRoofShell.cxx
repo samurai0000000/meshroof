@@ -23,9 +23,6 @@ MeshRoofShell::MeshRoofShell(shared_ptr<SimpleClient> client)
     : SimpleShell(client)
 {
     _help_list.push_back("exit");
-    _help_list.push_back("wcfg");
-    _help_list.push_back("disc");
-    _help_list.push_back("hb");
     _help_list.push_back("wifi");
     _help_list.push_back("net");
     _help_list.push_back("ping");
@@ -185,51 +182,6 @@ int MeshRoofShell::exit(int argc, char **argv)
     }
 
     return 0;
-}
-
-int MeshRoofShell::wcfg(int argc, char **argv)
-{
-    int ret = 0;
-
-    (void)(argc);
-    (void)(argv);
-
-    if (meshroof->sendWantConfig() != true) {
-        this->printf("failed!\n");
-        ret = -1;
-    }
-
-    return ret;
-}
-
-int MeshRoofShell::disc(int argc, char **argv)
-{
-   int ret = 0;
-
-    (void)(argc);
-    (void)(argv);
-
-    if (meshroof->sendDisconnect() != true) {
-        this->printf("failed!\n");
-        ret = -1;
-    }
-
-    return ret;
-}
-
-int MeshRoofShell::hb(int argc, char **argv)
-{
-   int ret = 0;
-
-    (void)(argc);
-    (void)(argv);
-
-    if (meshroof->sendHeartbeat() != true) {
-        this->printf("failed!\n");
-        ret = -1;
-    }
-
-    return ret;
 }
 
 int MeshRoofShell::wifi(int argc, char **argv)
@@ -565,12 +517,6 @@ int MeshRoofShell::unknown_command(int argc, char **argv)
 
     if (strcmp(argv[0], "exit") == 0) {
         ret = this->exit(argc, argv);
-    } else if (strcmp(argv[0], "wcfg") == 0) {
-        ret = this->wcfg(argc, argv);
-    } else if (strcmp(argv[0], "disc") == 0) {
-        ret = this->disc(argc, argv);
-    } else if (strcmp(argv[0], "hb") == 0) {
-        ret = this->hb(argc, argv);
     } else if (strcmp(argv[0], "wifi") == 0) {
         ret = this->wifi(argc, argv);
     } else if (strcmp(argv[0], "net") == 0) {
