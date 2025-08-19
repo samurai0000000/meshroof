@@ -15,7 +15,7 @@ set(LIBMESHTASTIC_SRCS
   ${LIBMESHTASTIC_PATH}/protocol.c
   ${LIBMESHTASTIC_PATH}/SimpleClient.cxx
   ${LIBMESHTASTIC_PATH}/HomeChat.cxx
-  ${LIBMESHTASTIC_PATH}/BaseNVM.cxx
+  ${LIBMESHTASTIC_PATH}/BaseNvm.cxx
   ${LIBMESHTASTIC_PATH}/SimpleShell.cxx
   )
 idf_component_register(
