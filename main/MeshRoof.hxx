@@ -13,6 +13,11 @@
 #include <BaseNvm.hxx>
 #include <EspWifi.hxx>
 
+#define AMPLIFY_PIN       ((gpio_num_t)  1)
+#define SWITCH_PIN        ((gpio_num_t)  2)
+#define OUTRESET_PIN      ((gpio_num_t)  3)
+#define ONBOARD_LED_PIN   ((gpio_num_t) 21)
+
 using namespace std;
 
 struct nvm_header {
@@ -59,6 +64,19 @@ public:
         return EspWifi::getInstance();
     }
 
+    void amplify(bool onOff);
+    bool isAmplifying(void) const;
+
+    void reset(void);
+    unsigned int getResetCount(void) const;
+    time_t getLastReset(void) const;
+
+    bool isOnboardLedOn(void) const;
+    void setOnboardLed(bool onOff);
+    void flipOnboardLed(void);
+
+    float getCpuTempC(void) const;
+
 protected:
 
     // Extend SimpleClient
@@ -77,8 +95,12 @@ protected:
     // Extend HomeChat
 
     virtual string handleUnknown(uint32_t node_num, string &message);
+    virtual string handleEnv(uint32_t node_num, string &message);
+    virtual string handleStatus(uint32_t node_num, string &message);
     virtual string handleWifi(uint32_t node_num, string &message);
     virtual string handleNet(uint32_t node_num, string &message);
+    virtual string handleAmplify(uint32_t node_num, string &message);
+    virtual string handleReset(uint32_t node_num, string &message);
     virtual int vprintf(const char *format, va_list ap) const;
 
 public:
@@ -116,6 +138,13 @@ public:
 private:
 
     struct nvm_main_body _main_body;
+
+    bool _isAmplifying;
+    unsigned int _resetCount;
+    time_t _lastReset;
+    bool _onboardLed;
+    void *_esp_temp_handle;
+
 };
 
 #endif

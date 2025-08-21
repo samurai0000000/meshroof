@@ -7,7 +7,6 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <fcntl.h>
-#include <driver/gpio.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
@@ -25,8 +24,6 @@
 #include <MeshRoof.hxx>
 #include <MeshRoofShell.hxx>
 #include "version.h"
-
-#define BLINK_GPIO (gpio_num_t) 21
 
 #define LED_TASK_STACK_SIZE            configMINIMAL_STACK_SIZE
 #define LED_TASK_PRIORITY              (tskIDLE_PRIORITY + 1UL)
@@ -57,15 +54,8 @@ static string copyright = string("Copyright (C) 2025, Charles Chiou");
 
 static void led_task(__unused void *params)
 {
-    bool led_on = false;
-
-    gpio_reset_pin(BLINK_GPIO);
-    gpio_set_direction(BLINK_GPIO, GPIO_MODE_OUTPUT);
-
     for (;;) {
-        gpio_set_level(BLINK_GPIO, led_on);
-        led_on = !led_on;
-
+        meshroof->flipOnboardLed();
         vTaskDelay(pdMS_TO_TICKS(1000));
     }
 }
@@ -191,6 +181,28 @@ static void meshtastic_task(__unused void *params)
     int ret;
     time_t now, last_want_config, last_heartbeat;
 
+    if (meshroof->loadNvm() == false) {
+        meshroof->saveNvm();
+    }
+    meshroof->applyNvmToHomeChat();
+    meshroof->espWifi()->start();
+
+    xTaskCreatePinnedToCore(tcp_console_task,
+                            "TcpConsoleTask",
+                            TCP_CONSOLE_TASK_STACK_SIZE,
+                            NULL,
+                            TCP_CONSOLE_TASK_PRIORITY,
+                            NULL,
+                            1);
+
+    xTaskCreatePinnedToCore(binder_task,
+                            "BinderTask",
+                            BINDER_TASK_STACK_SIZE,
+                            NULL,
+                            BINDER_TASK_PRIORITY,
+                            NULL,
+                            1);
+
     now = time(NULL);
     last_heartbeat = now;
     last_want_config = 0;
@@ -250,11 +262,6 @@ extern "C" void app_main(void)
     meshroof->setClient(meshroof);
     meshroof->setNvm(meshroof);
     meshroof->sendDisconnect();
-    if (meshroof->loadNvm() == false) {
-        meshroof->saveNvm();  // Create a default
-    }
-    meshroof->applyNvmToHomeChat();
-    meshroof->espWifi()->start();
 
     shell = make_shared<MeshRoofShell>();
     shell->setBanner(banner);
@@ -296,22 +303,6 @@ extern "C" void app_main(void)
                             CONSOLE_TASK_STACK_SIZE,
                             NULL,
                             CONSOLE_TASK_PRIORITY,
-                            NULL,
-                            1);
-
-    xTaskCreatePinnedToCore(tcp_console_task,
-                            "TcpConsoleTask",
-                            TCP_CONSOLE_TASK_STACK_SIZE,
-                            NULL,
-                            TCP_CONSOLE_TASK_PRIORITY,
-                            NULL,
-                            1);
-
-    xTaskCreatePinnedToCore(binder_task,
-                            "BinderTask",
-                            BINDER_TASK_STACK_SIZE,
-                            NULL,
-                            BINDER_TASK_PRIORITY,
                             NULL,
                             1);
 

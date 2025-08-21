@@ -14,6 +14,8 @@
 #include <esp_log.h>
 #include <nvs_flash.h>
 #include <nvs.h>
+#include <driver/gpio.h>
+#include <driver/temperature_sensor.h>
 #include <sstream>
 #include <iomanip>
 #include <algorithm>
@@ -27,11 +29,111 @@ MeshRoof::MeshRoof()
       HomeChat()
 {
     bzero(&_main_body, sizeof(_main_body));
+    _isAmplifying = false;
+    _resetCount = 1;
+    _lastReset = time(NULL);
+
+    gpio_reset_pin(AMPLIFY_PIN);
+    gpio_set_direction(AMPLIFY_PIN, GPIO_MODE_OUTPUT);
+    gpio_reset_pin(SWITCH_PIN);
+    gpio_set_direction(SWITCH_PIN, GPIO_MODE_OUTPUT);
+    amplify(false);
+
+    gpio_reset_pin(OUTRESET_PIN);
+    gpio_set_direction(OUTRESET_PIN, GPIO_MODE_OUTPUT);
+    gpio_set_level(OUTRESET_PIN, true);
+
+    gpio_reset_pin(ONBOARD_LED_PIN);
+    gpio_set_direction(ONBOARD_LED_PIN, GPIO_MODE_OUTPUT);
+    setOnboardLed(false);
+
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wmissing-field-initializers"
+    temperature_sensor_config_t cfg =
+        TEMPERATURE_SENSOR_CONFIG_DEFAULT(-10, 80);
+#pragma GCC diagnostic pop
+
+    _esp_temp_handle = NULL;
+    ESP_ERROR_CHECK(temperature_sensor_install(&cfg,
+                                               (temperature_sensor_handle_t *)
+                                               &_esp_temp_handle));
+    ESP_ERROR_CHECK(temperature_sensor_enable((temperature_sensor_handle_t)
+                                              _esp_temp_handle));
 }
 
 MeshRoof::~MeshRoof()
 {
 
+}
+
+void MeshRoof::amplify(bool onOff)
+{
+    _isAmplifying = onOff;
+    gpio_set_level(AMPLIFY_PIN, onOff);
+    gpio_set_level(SWITCH_PIN, onOff);
+}
+
+bool MeshRoof::isAmplifying(void) const
+{
+    return _isAmplifying;
+}
+
+void MeshRoof::reset(void)
+{
+    _resetCount++;
+
+    gpio_set_level(OUTRESET_PIN, false);
+    vTaskDelay(pdMS_TO_TICKS(500));
+    gpio_set_level(OUTRESET_PIN, true);
+
+    _lastReset = time(NULL);
+}
+
+unsigned int MeshRoof::getResetCount(void) const
+{
+    return _resetCount;
+}
+
+time_t MeshRoof::getLastReset(void) const
+{
+    return _lastReset;
+}
+
+bool MeshRoof::isOnboardLedOn(void) const
+{
+    return _onboardLed;
+}
+
+void MeshRoof::setOnboardLed(bool onOff)
+{
+    _onboardLed = onOff;
+    gpio_set_level(ONBOARD_LED_PIN, onOff);
+}
+
+void MeshRoof::flipOnboardLed(void)
+{
+    _onboardLed = !_onboardLed;
+    gpio_set_level(ONBOARD_LED_PIN, _onboardLed);
+}
+
+float MeshRoof::getCpuTempC(void) const
+{
+    float tempC = 0.0;
+    esp_err_t ret;
+
+    if (_esp_temp_handle == NULL) {
+        goto done;
+    }
+
+    ret = temperature_sensor_get_celsius((temperature_sensor_handle_t)
+                                         _esp_temp_handle, &tempC);
+    if (ret != ESP_OK) {
+        goto done;
+    }
+
+done:
+
+    return tempC;
 }
 
 void MeshRoof::gotTextMessage(const meshtastic_MeshPacket &packet,
@@ -76,13 +178,44 @@ string MeshRoof::handleUnknown(uint32_t node_num, string &message)
     message = message.substr(first_word.size());
     trimWhitespace(message);
 
-    if (first_word == "wifi") {
+    if (first_word == "status") {
+        reply = handleStatus(node_num, message);
+    } else if (first_word == "wifi") {
         reply = handleWifi(node_num, message);
     } else if (first_word == "net") {
         reply = handleNet(node_num, message);
+    } else if (first_word == "amplify") {
+        reply = handleAmplify(node_num, message);
+    } else if (first_word == "reset") {
+        reply = handleReset(node_num, message);
     }
 
     return reply;
+}
+
+string MeshRoof::handleStatus(uint32_t node_num, string &message)
+{
+    string reply;
+
+    (void)(node_num);
+    (void)(message);
+
+    return reply;
+}
+
+string MeshRoof::handleEnv(uint32_t node_num, string &message)
+{
+    stringstream ss;
+
+    ss << HomeChat::handleEnv(node_num, message);
+    if (!ss.str().empty()) {
+        ss << endl;
+    }
+
+    ss << "cpu temperature: ";
+    ss <<  setprecision(3) << getCpuTempC();
+
+    return ss.str();
 }
 
 string MeshRoof::handleWifi(uint32_t node_num, string &message)
@@ -156,6 +289,26 @@ string MeshRoof::handleNet(uint32_t node_num, string &message)
     ss << buf;
 
     return ss.str();
+}
+
+string MeshRoof::handleAmplify(uint32_t node_num, string &message)
+{
+    string reply;
+
+    (void)(node_num);
+    (void)(message);
+
+    return reply;
+}
+
+string MeshRoof::handleReset(uint32_t node_num, string &message)
+{
+    string reply;
+
+    (void)(node_num);
+    (void)(message);
+
+    return reply;
 }
 
 int MeshRoof::vprintf(const char *format, va_list ap) const

@@ -26,6 +26,8 @@ MeshRoofShell::MeshRoofShell(shared_ptr<SimpleClient> client)
     _help_list.push_back("wifi");
     _help_list.push_back("net");
     _help_list.push_back("ping");
+    _help_list.push_back("amplify");
+    _help_list.push_back("reset");
 }
 
 MeshRoofShell::~MeshRoofShell()
@@ -147,6 +149,7 @@ int MeshRoofShell::system(int argc, char **argv)
     this->printf("Total Heap: %zu\n", total_heap);
     this->printf(" Free Heap: %zu\n", free_heap);
     this->printf(" Used Heap: %zu\n", used_heap);
+    this->printf("  CPU Temp: %.1fC\n", meshroof->getCpuTempC());
 
     return 0;
 }
@@ -511,6 +514,52 @@ done:
     return ret;
 }
 
+int MeshRoofShell::amplify(int argc, char **argv)
+{
+    int ret = 0;
+
+    if (argc == 1) {
+        this->printf("amplify: %s\n", meshroof->isAmplifying() ? "on" : "off");
+    } else if ((argc == 2) && (strcmp(argv[1], "on") == 0)) {
+        meshroof->amplify(true);
+        this->printf("amplify on\n");
+    } else if ((argc == 2) && (strcmp(argv[1], "off") == 0)) {
+        meshroof->amplify(true);
+        this->printf("amplify off\n");
+    } else {
+        this->printf("syntax error!\n");
+        ret = -1;
+    }
+
+    return ret;
+}
+
+int MeshRoofShell::reset(int argc, char **argv)
+{
+    int ret = 0;
+
+    if (argc == 1) {
+        time_t now, last;
+        unsigned int secs_ago = 0;
+
+        last = meshroof->getLastReset();
+        now = time(NULL);
+        secs_ago = now - last;
+
+        this->printf("reset count: %u\n", meshroof->getResetCount());
+        if (secs_ago != 0) {
+            this->printf("last reset: %u seconds ago\n", secs_ago);
+        }
+    } else if ((argc == 2) && strcmp(argv[1], "apply") == 0) {
+        meshroof->reset();
+    } else {
+        this->printf("syntax error!\n");
+        ret = -1;
+    }
+
+    return ret;
+}
+
 int MeshRoofShell::unknown_command(int argc, char **argv)
 {
     int ret = 0;
@@ -523,6 +572,10 @@ int MeshRoofShell::unknown_command(int argc, char **argv)
         ret = this->net(argc, argv);
     } else if (strcmp(argv[0], "ping") == 0) {
         ret = this->ping(argc, argv);
+    } else if (strcmp(argv[0], "amplify") == 0) {
+        ret = this->amplify(argc, argv);
+    } else if (strcmp(argv[0], "reset") == 0) {
+        ret = this->reset(argc, argv);
     } else {
         this->printf("Unknown command '%s'!\n", argv[0]);
         ret = -1;

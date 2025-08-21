@@ -36,6 +36,8 @@ protected:
     static void on_ping_timeout(esp_ping_handle_t hdl, void *args);
     static void on_ping_end(esp_ping_handle_t hdl, void *args);
     virtual int ping(int argc, char **argv);
+    virtual int amplify(int argc, char **argv);
+    virtual int reset(int argc, char **argv);
     virtual int unknown_command(int argc, char **argv);
 
 };

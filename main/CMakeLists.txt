@@ -29,6 +29,6 @@ idf_component_register(
   INCLUDE_DIRS "." "${LIBMESHTASTIC_PATH}" "${MESHARDUINO_PATH}"
   "${CMAKE_CURRENT_BINARY_DIR}/../../"
   REQUIRES esp_driver_gpio esp_driver_uart esp_driver_usb_serial_jtag console
-           esp_timer esp_netif esp_wifi nvs_flash
+           esp_timer esp_netif esp_wifi nvs_flash esp_driver_tsens
   )
 
