@@ -30,7 +30,7 @@ MeshRoof::MeshRoof()
 {
     bzero(&_main_body, sizeof(_main_body));
     _isAmplifying = false;
-    _resetCount = 1;
+    _resetCount = 0;
     _lastReset = time(NULL);
 
     gpio_reset_pin(AMPLIFY_PIN);
@@ -41,7 +41,7 @@ MeshRoof::MeshRoof()
 
     gpio_reset_pin(OUTRESET_PIN);
     gpio_set_direction(OUTRESET_PIN, GPIO_MODE_OUTPUT);
-    gpio_set_level(OUTRESET_PIN, true);
+    reset();
 
     gpio_reset_pin(ONBOARD_LED_PIN);
     gpio_set_direction(ONBOARD_LED_PIN, GPIO_MODE_OUTPUT);
@@ -81,6 +81,8 @@ bool MeshRoof::isAmplifying(void) const
 void MeshRoof::reset(void)
 {
     _resetCount++;
+
+    sendDisconnect();
 
     gpio_set_level(OUTRESET_PIN, false);
     vTaskDelay(pdMS_TO_TICKS(500));

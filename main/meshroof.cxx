@@ -281,12 +281,7 @@ extern "C" void app_main(void)
     shell2->setNvm(meshroof);
     shell2->attach((void *) 0);
     shell2->setNoEcho(true);
-
-    struct vprintf_callback cb = {
-        .ctx = shell2.get(),
-        .vprintf = SimpleShell::ctx_vprintf,
-    };
-    meshroof->addPrintfCallback(cb);
+    meshroof->addPrintfCallback(shell2.get(), shell->ctx_vprintf);
 
     queue = xQueueCreate(1, sizeof(int));
 
