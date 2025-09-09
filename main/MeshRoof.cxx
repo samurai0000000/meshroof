@@ -25,8 +25,7 @@
 static const char *TAG = "MeshRoof";
 
 MeshRoof::MeshRoof()
-    : SimpleClient(),
-      HomeChat()
+    : SimpleClient(), HomeChat(), BaseNvm(), MorseBuzzer()
 {
     bzero(&_main_body, sizeof(_main_body));
     _isAmplifying = false;
@@ -42,6 +41,10 @@ MeshRoof::MeshRoof()
     gpio_reset_pin(OUTRESET_PIN);
     gpio_set_direction(OUTRESET_PIN, GPIO_MODE_OUTPUT);
     reset();
+
+    gpio_reset_pin(BUZZER_PIN);
+    gpio_set_direction(BUZZER_PIN, GPIO_MODE_OUTPUT);
+    gpio_set_level(BUZZER_PIN, false);
 
     gpio_reset_pin(ONBOARD_LED_PIN);
     gpio_set_direction(ONBOARD_LED_PIN, GPIO_MODE_OUTPUT);
@@ -99,6 +102,31 @@ unsigned int MeshRoof::getResetCount(void) const
 time_t MeshRoof::getLastReset(void) const
 {
     return _lastReset;
+}
+
+unsigned int MeshRoof::getLastResetSecsAgo(void) const
+{
+    time_t now;
+
+    now = time(NULL);
+
+    return now - _lastReset;
+}
+
+void MeshRoof::buzz(unsigned int ms)
+{
+    gpio_set_level(BUZZER_PIN, true);
+    vTaskDelay(pdMS_TO_TICKS(ms));
+    gpio_set_level(BUZZER_PIN, false);
+}
+
+void MeshRoof::buzzMorseCode(const string &text, bool clearPrevious)
+{
+    if (clearPrevious) {
+        this->clearMorseText();
+    }
+
+    this->addMorseText(text);
 }
 
 bool MeshRoof::isOnboardLedOn(void) const
@@ -190,6 +218,10 @@ string MeshRoof::handleUnknown(uint32_t node_num, string &message)
         reply = handleAmplify(node_num, message);
     } else if (first_word == "reset") {
         reply = handleReset(node_num, message);
+    } else if (first_word == "buzz") {
+        reply = handleBuzz(node_num, message);
+    } else if (first_word == "morse") {
+        reply = handleMorse(node_num, message);
     }
 
     return reply;
@@ -309,6 +341,31 @@ string MeshRoof::handleReset(uint32_t node_num, string &message)
 
     (void)(node_num);
     (void)(message);
+
+    return reply;
+}
+
+string MeshRoof::handleBuzz(uint32_t node_num, string &message)
+{
+    string reply;
+
+    (void)(node_num);
+    (void)(message);
+
+    buzz();
+
+    return reply;
+}
+
+string MeshRoof::handleMorse(uint32_t node_num, string &message)
+{
+    string reply;
+
+    (void)(node_num);
+    (void)(message);
+
+    addMorseText(message);
+    reply = "buzzing morse code: '" + message + "'";
 
     return reply;
 }
@@ -829,6 +886,20 @@ bool MeshRoof::applyNvmToHomeChat(void)
     }
 
     return result;
+}
+
+void MeshRoof::sleepForMs(unsigned int ms)
+{
+    vTaskDelay(pdMS_TO_TICKS(ms));
+}
+
+void MeshRoof::toggleBuzzer(bool onOff)
+{
+    if (onOff) {
+        gpio_set_level(BUZZER_PIN, true);
+    } else {
+        gpio_set_level(BUZZER_PIN, false);
+    }
 }
 
 /*

@@ -17,6 +17,7 @@ set(LIBMESHTASTIC_SRCS
   ${LIBMESHTASTIC_PATH}/HomeChat.cxx
   ${LIBMESHTASTIC_PATH}/BaseNvm.cxx
   ${LIBMESHTASTIC_PATH}/SimpleShell.cxx
+  ${LIBMESHTASTIC_PATH}/MorseBuzzer.cxx
   )
 idf_component_register(
   SRCS

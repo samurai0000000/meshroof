@@ -33,6 +33,8 @@
 #define TCP_CONSOLE_TASK_PRIORITY      (tskIDLE_PRIORITY + 3UL)
 #define BINDER_TASK_STACK_SIZE         (2 * 1024)
 #define BINDER_TASK_PRIORITY           (tskIDLE_PRIORITY + 4UL)
+#define MORSEBUZZER_TASK_STACK_SIZE    (2 * 1024)
+#define MORSEBUZZER_TASK_PRIORITY      (tskIDLE_PRIORITY + 5UL)
 
 extern void serial_init(void);
 
@@ -210,6 +212,13 @@ static void meshtastic_task(__unused void *params)
     for (;;) {
         now = time(NULL);
 
+        if (meshroof->isConnected() &&
+            (meshroof->meshDeviceLastRecivedSecondsAgo() > 300) &&
+            (meshroof->getLastResetSecsAgo() > 120)) {
+            usb_printf("detected meshtastic stuck!\n");
+            meshroof->reset();
+        }
+
         if (!meshroof->isConnected() && ((now - last_want_config) >= 5)) {
             ret = meshroof->sendWantConfig();
             if (ret == false) {
@@ -239,6 +248,13 @@ static void meshtastic_task(__unused void *params)
         }
 
         taskYIELD();
+    }
+}
+
+static void morsebuzzer_task(__unused void *params)
+{
+    for (;;) {
+        meshroof->runMorseThread();
     }
 }
 
@@ -300,6 +316,14 @@ extern "C" void app_main(void)
                             CONSOLE_TASK_PRIORITY,
                             NULL,
                             1);
+
+    xTaskCreatePinnedToCore(morsebuzzer_task,
+                            "MorseBuzzerTask",
+                            MORSEBUZZER_TASK_STACK_SIZE,
+                            NULL,
+                            MORSEBUZZER_TASK_PRIORITY,
+                            NULL,
+                            0);
 
     meshtastic_task(NULL);
 }

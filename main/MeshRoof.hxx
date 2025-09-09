@@ -11,11 +11,14 @@
 #include <SimpleClient.hxx>
 #include <HomeChat.hxx>
 #include <BaseNvm.hxx>
+#include <MorseBuzzer.hxx>
 #include <EspWifi.hxx>
 
-#define AMPLIFY_PIN       ((gpio_num_t)  1)
-#define SWITCH_PIN        ((gpio_num_t)  2)
-#define OUTRESET_PIN      ((gpio_num_t)  3)
+#define EXRESET_PIN       ((gpio_num_t)  1)
+#define AMPLIFY_PIN       ((gpio_num_t)  2)
+#define SWITCH_PIN        ((gpio_num_t)  3)
+#define OUTRESET_PIN      ((gpio_num_t)  4)
+#define BUZZER_PIN        ((gpio_num_t)  8)
 #define ONBOARD_LED_PIN   ((gpio_num_t) 21)
 
 using namespace std;
@@ -53,6 +56,7 @@ struct nvm_footer {
  * Suitable for use on resource-constraint MCU platforms.
  */
 class MeshRoof : public SimpleClient, public HomeChat, public BaseNvm,
+                 public MorseBuzzer,
                  public enable_shared_from_this<MeshRoof> {
 
 public:
@@ -70,10 +74,14 @@ public:
     void reset(void);
     unsigned int getResetCount(void) const;
     time_t getLastReset(void) const;
+    unsigned int getLastResetSecsAgo(void) const;
 
     bool isOnboardLedOn(void) const;
     void setOnboardLed(bool onOff);
     void flipOnboardLed(void);
+
+    void buzz(unsigned int ms = 500);
+    void buzzMorseCode(const string &text, bool clearPrevious = false);
 
     float getCpuTempC(void) const;
 
@@ -101,9 +109,13 @@ protected:
     virtual string handleNet(uint32_t node_num, string &message);
     virtual string handleAmplify(uint32_t node_num, string &message);
     virtual string handleReset(uint32_t node_num, string &message);
+    virtual string handleBuzz(uint32_t node_num, string &message);
+    virtual string handleMorse(uint32_t node_num, string &message);
     virtual int vprintf(const char *format, va_list ap) const;
 
 public:
+
+    // Extend BaseNVM
 
     string getWifiSsid(void) const;
     string getWifiPasswd(void) const;
@@ -134,6 +146,13 @@ public:
     virtual bool loadNvm(void);
     virtual bool saveNvm(void);
     bool applyNvmToHomeChat(void);
+
+protected:
+
+    // Extend MorseBuzzer
+
+    virtual void sleepForMs(unsigned int ms);
+    virtual void toggleBuzzer(bool onOff);
 
 private:
 

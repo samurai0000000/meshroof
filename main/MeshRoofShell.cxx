@@ -27,6 +27,8 @@ MeshRoofShell::MeshRoofShell(shared_ptr<SimpleClient> client)
     _help_list.push_back("net");
     _help_list.push_back("ping");
     _help_list.push_back("amplify");
+    _help_list.push_back("buzz");
+    _help_list.push_back("morse");
     _help_list.push_back("reset");
 }
 
@@ -534,6 +536,39 @@ int MeshRoofShell::amplify(int argc, char **argv)
     return ret;
 }
 
+int MeshRoofShell::buzz(int argc, char **argv)
+{
+    if (argc == 1) {
+        meshroof->buzz();
+    } else if ((argc == 2)) {
+        unsigned int ms;
+
+        try {
+            ms = stoul(argv[1]);
+            meshroof->buzz(ms);
+        } catch (const invalid_argument &e) {
+            this->printf("syntax error!\n");
+        }
+    } else {
+        this->printf("syntax error!\n");
+    }
+
+    return -1;
+}
+
+int MeshRoofShell::morse(int argc, char **argv)
+{
+    string text;
+
+    for (int i = 1; i < argc; i++) {
+        text += argv[i];
+    }
+
+    meshroof->addMorseText(text);
+
+    return 0;
+}
+
 int MeshRoofShell::reset(int argc, char **argv)
 {
     int ret = 0;
@@ -574,6 +609,10 @@ int MeshRoofShell::unknown_command(int argc, char **argv)
         ret = this->ping(argc, argv);
     } else if (strcmp(argv[0], "amplify") == 0) {
         ret = this->amplify(argc, argv);
+    } else if (strcmp(argv[0], "buzz") == 0) {
+        ret = this->buzz(argc, argv);
+    } else if (strcmp(argv[0], "morse") == 0) {
+        ret = this->morse(argc, argv);
     } else if (strcmp(argv[0], "reset") == 0) {
         ret = this->reset(argc, argv);
     } else {
