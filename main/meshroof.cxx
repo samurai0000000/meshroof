@@ -18,6 +18,7 @@
 #include <driver/usb_serial_jtag.h>
 #include <esp_timer.h>
 #include <esp_log.h>
+#include <esp_task_wdt.h>
 #include <nvs_flash.h>
 #include <nvs.h>
 #include <meshroof.h>
@@ -182,6 +183,22 @@ static void meshtastic_task(__unused void *params)
 {
     int ret;
     time_t now, last_want_config, last_heartbeat;
+    esp_err_t err;
+    esp_task_wdt_config_t twdt_config = {
+        .timeout_ms = 15000,
+        .idle_core_mask = (1 << portNUM_PROCESSORS) - 1, // Apply to all cores
+        .trigger_panic = true, // Restart on timeout
+    };
+
+    err = esp_task_wdt_init(&twdt_config);
+    if (err != ESP_OK) {
+        printf("Error initializing WDT: %s\n", esp_err_to_name(err));
+    }
+
+    err = esp_task_wdt_add(NULL);
+    if (err != ESP_OK) {
+        printf("Error adding current task to WDT: %s\n", esp_err_to_name(err));
+    }
 
     if (meshroof->loadNvm() == false) {
         meshroof->saveNvm();
@@ -209,7 +226,11 @@ static void meshtastic_task(__unused void *params)
     last_heartbeat = now;
     last_want_config = 0;
 
+    meshroof->addMorseText("s");
+
     for (;;) {
+        esp_task_wdt_reset();
+
         now = time(NULL);
 
         if (meshroof->isConnected() &&

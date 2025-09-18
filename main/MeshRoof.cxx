@@ -72,8 +72,8 @@ MeshRoof::~MeshRoof()
 void MeshRoof::amplify(bool onOff)
 {
     _isAmplifying = onOff;
-    gpio_set_level(AMPLIFY_PIN, onOff);
-    gpio_set_level(SWITCH_PIN, onOff);
+    gpio_set_level(AMPLIFY_PIN, !onOff);
+    gpio_set_level(SWITCH_PIN, !onOff);
 }
 
 bool MeshRoof::isAmplifying(void) const

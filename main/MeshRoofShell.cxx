@@ -526,7 +526,7 @@ int MeshRoofShell::amplify(int argc, char **argv)
         meshroof->amplify(true);
         this->printf("amplify on\n");
     } else if ((argc == 2) && (strcmp(argv[1], "off") == 0)) {
-        meshroof->amplify(true);
+        meshroof->amplify(false);
         this->printf("amplify off\n");
     } else {
         this->printf("syntax error!\n");
