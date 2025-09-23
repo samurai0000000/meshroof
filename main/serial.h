@@ -17,7 +17,6 @@ extern int usb_tx_write(const uint8_t *data, size_t size);
 extern int usb_printf(const char *format, ...);
 extern int usb_vprintf(const char *format, va_list ap);
 extern int usb_rx_ready(void);
-extern int usb_rx_read(uint8_t *data, size_t size);
 extern int usb_rx_read_timeout(uint8_t *data, size_t size, unsigned int ticks);
 
 extern int serial_write(const void *buf, size_t len);

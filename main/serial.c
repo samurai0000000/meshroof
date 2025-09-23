@@ -5,6 +5,7 @@
  */
 
 #include <stdarg.h>
+#include <errno.h>
 #include <fcntl.h>
 #include <sys/select.h>
 #include <driver/gpio.h>
@@ -73,14 +74,11 @@ void serial_init(void)
         ESP_LOGE(TAG, "uart_set_pin failed!");
     }
 
-
     fd = open("/dev/uart/0", O_RDWR);
     if (fd == -1) {
         ESP_LOGE(TAG, "open /dev/uart/0 failed!");
         goto done;
     }
-
-    uart_vfs_dev_use_driver(UART_NUM_0);
 
 done:
 
@@ -89,6 +87,10 @@ done:
 
 int usb_tx_write(const uint8_t *data, size_t size)
 {
+    if (usb_serial_jtag_is_connected() == false) {
+        return size;
+    }
+
     return usb_serial_jtag_write_bytes(data, size, 0);
 }
 
@@ -107,40 +109,38 @@ int usb_printf(const char *format, ...)
 int usb_vprintf(const char *format, va_list ap)
 {
     int ret = 0;
-    char *pbuf = NULL;
+    char pbuf[SERIAL_PBUF_SIZE];
     int i;
-
-    pbuf = (char *) malloc(SERIAL_PBUF_SIZE);
-    if (pbuf == NULL) {
-        goto done;
-    }
 
     ret = vsnprintf(pbuf, SERIAL_PBUF_SIZE - 1, format, ap);
 
+    if (usb_serial_jtag_is_connected() == false) {
+        goto done;
+    }
+
     for (i = 0; i < ret; i++) {
         if (pbuf[i] == '\n') {
-            while (usb_serial_jtag_write_bytes("\r", 1, 0) != 1);
+            do {
+                if (usb_serial_jtag_is_connected() == false) {
+                    break;
+                }
+            } while (usb_serial_jtag_write_bytes("\r", 1, 0) != 1);
         }
-        while (usb_serial_jtag_write_bytes(pbuf + i, 1, 0) != 1);
+        do {
+            if (usb_serial_jtag_is_connected() == false) {
+                break;
+            }
+        } while (usb_serial_jtag_write_bytes(pbuf + i, 1, 0) != 1);
     }
 
 done:
-
-    if (pbuf) {
-        free(pbuf);
-    }
 
     return ret;
 }
 
 int usb_rx_ready(void)
 {
-    return 1;
-}
-
-int usb_rx_read(uint8_t *data, size_t size)
-{
-    return usb_serial_jtag_read_bytes(data, size, 0);
+    return usb_serial_jtag_is_connected();
 }
 
 int usb_rx_read_timeout(uint8_t *data, size_t size, unsigned int ticks)
@@ -171,6 +171,9 @@ int serial_rx_ready(void)
     FD_SET(fd, &rfds);
 
     ret = select(fd + 1, &rfds, NULL, NULL, &timeout);
+    if (ret == -1) {
+        ESP_LOGE(TAG, "select ret=%d errno=%d", ret, errno);
+    }
 
 done:
 
