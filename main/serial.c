@@ -18,11 +18,11 @@
 #include <sdkconfig.h>
 #include <meshroof.h>
 
-#define SERIAL_PBUF_SIZE  256
+#define SERIAL_PBUF_SIZE  512
 
 #define SERIAL_RX_PIN GPIO_NUM_44
 #define SERIAL_TX_PIN GPIO_NUM_43
-#define UART_BUF_SIZE 256
+#define UART_BUF_SIZE 512
 
 static const char *TAG = "serial";
 

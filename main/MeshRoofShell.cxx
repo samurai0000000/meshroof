@@ -146,12 +146,19 @@ int MeshRoofShell::system(int argc, char **argv)
     size_t total_heap = heap_caps_get_total_size(MALLOC_CAP_INTERNAL);
     size_t free_heap = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
     size_t used_heap = total_heap - free_heap;
+    char cTaskListBuffer[1024];
 
     SimpleShell::system(argc, argv);
     this->printf("Total Heap: %zu\n", total_heap);
     this->printf(" Free Heap: %zu\n", free_heap);
     this->printf(" Used Heap: %zu\n", used_heap);
     this->printf("  CPU Temp: %.1fC\n", meshroof->getCpuTempC());
+    bzero(cTaskListBuffer, sizeof(cTaskListBuffer));
+    vTaskList(cTaskListBuffer);
+    this->printf("  FreeRTOS:\n");
+    this->printf("Name        State  Priority  StackRem   Task#   CPU Affn\n");
+    this->printf("--------------------------------------------------------\n");
+    this->printf("%s", cTaskListBuffer);
 
     return 0;
 }

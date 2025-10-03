@@ -26,16 +26,17 @@
 #include <MeshRoofShell.hxx>
 #include "version.h"
 
-#define LED_TASK_STACK_SIZE            configMINIMAL_STACK_SIZE
-#define LED_TASK_PRIORITY              (tskIDLE_PRIORITY + 1UL)
-#define CONSOLE_TASK_STACK_SIZE        (6 * 1024)
-#define CONSOLE_TASK_PRIORITY          (tskIDLE_PRIORITY + 2UL)
-#define TCP_CONSOLE_TASK_STACK_SIZE    (6 * 1024)
-#define TCP_CONSOLE_TASK_PRIORITY      (tskIDLE_PRIORITY + 3UL)
-#define BINDER_TASK_STACK_SIZE         (2 * 1024)
-#define BINDER_TASK_PRIORITY           (tskIDLE_PRIORITY + 4UL)
-#define MORSEBUZZER_TASK_STACK_SIZE    (2 * 1024)
-#define MORSEBUZZER_TASK_PRIORITY      (tskIDLE_PRIORITY + 5UL)
+#define LED_TASK_STACK_SIZE            1024
+#define LED_TASK_PRIORITY              15
+#define MORSEBUZZER_TASK_STACK_SIZE    1536
+#define MORSEBUZZER_TASK_PRIORITY      14
+#define CONSOLE_TASK_STACK_SIZE        6144
+#define CONSOLE_TASK_PRIORITY          5
+#define TCP_CONSOLE_TASK_STACK_SIZE    6144
+#define TCP_CONSOLE_TASK_PRIORITY      5
+#define BINDER_TASK_STACK_SIZE         2048
+#define BINDER_TASK_PRIORITY           4
+#define MESHTASTIC_TASK_PRIORITY       10
 
 extern void serial_init(void);
 
@@ -63,20 +64,19 @@ static void led_task(__unused void *params)
     }
 }
 
+static void morsebuzzer_task(__unused void *params)
+{
+    for (;;) {
+        meshroof->runMorseThread();
+    }
+}
+
 static void console_task(__unused void *params)
 {
     int ret;
 
     vTaskDelay(pdMS_TO_TICKS(1000));
-
-    usb_printf("\n\x1b[2K");
-    usb_printf("%s\n", shell->banner().c_str());
-    usb_printf("%s\n", shell->version().c_str());
-    usb_printf("%s\n", shell->built().c_str());
-    usb_printf("-------------------------------------------\n");
-    usb_printf("%s\n", shell->copyright().c_str());
-    usb_printf("> ");
-
+    shell->showWelcome();
     for (;;) {
         do {
             ret = shell->process();
@@ -97,7 +97,8 @@ static void tcp_console_task(__unused void *params)
             ret = xQueueReceive(queue, &tcp_fd, portMAX_DELAY);
             if ((ret == pdPASS) && (tcp_fd > 0)) {
                 uint32_t ctx = 0x80000000 | tcp_fd;
-                shell2->attach((void *) ctx, true);
+                shell2->attach((void *) ctx);
+                shell2->showWelcome();
             }
             continue;
         }
@@ -207,7 +208,7 @@ static void meshtastic_task(__unused void *params)
     meshroof->espWifi()->start();
 
     xTaskCreatePinnedToCore(tcp_console_task,
-                            "TcpConsoleTask",
+                            "TcpConsole",
                             TCP_CONSOLE_TASK_STACK_SIZE,
                             NULL,
                             TCP_CONSOLE_TASK_PRIORITY,
@@ -215,7 +216,7 @@ static void meshtastic_task(__unused void *params)
                             1);
 
     xTaskCreatePinnedToCore(binder_task,
-                            "BinderTask",
+                            "TcpBinder",
                             BINDER_TASK_STACK_SIZE,
                             NULL,
                             BINDER_TASK_PRIORITY,
@@ -272,13 +273,6 @@ static void meshtastic_task(__unused void *params)
     }
 }
 
-static void morsebuzzer_task(__unused void *params)
-{
-    for (;;) {
-        meshroof->runMorseThread();
-    }
-}
-
 extern "C" void app_main(void)
 {
     esp_err_t err;
@@ -323,29 +317,30 @@ extern "C" void app_main(void)
     queue = xQueueCreate(1, sizeof(int));
 
     xTaskCreatePinnedToCore(led_task,
-                            "LedTask",
+                            "Led",
                             LED_TASK_STACK_SIZE,
                             NULL,
                             LED_TASK_PRIORITY,
                             NULL,
                             0);
 
+
+    xTaskCreatePinnedToCore(morsebuzzer_task,
+                            "MorseBuzzer",
+                            MORSEBUZZER_TASK_STACK_SIZE,
+                            NULL,
+                            MORSEBUZZER_TASK_PRIORITY,
+                            NULL,
+                            0);
     xTaskCreatePinnedToCore(console_task,
-                            "ConsoleTask",
+                            "Console",
                             CONSOLE_TASK_STACK_SIZE,
                             NULL,
                             CONSOLE_TASK_PRIORITY,
                             NULL,
                             1);
 
-    xTaskCreatePinnedToCore(morsebuzzer_task,
-                            "MorseBuzzerTask",
-                            MORSEBUZZER_TASK_STACK_SIZE,
-                            NULL,
-                            MORSEBUZZER_TASK_PRIORITY,
-                            NULL,
-                            0);
-
+    vTaskPrioritySet(NULL, MESHTASTIC_TASK_PRIORITY);
     meshtastic_task(NULL);
 }
 
