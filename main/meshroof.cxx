@@ -290,24 +290,20 @@ extern "C" void app_main(void)
     ESP_ERROR_CHECK(err);
 
     meshroof = make_shared<MeshRoof>();
+    meshroof->setBanner(banner);
+    meshroof->setVersion(version);
+    meshroof->setBuilt(built);
+    meshroof->setCopyright(copyright);
     meshroof->setClient(meshroof);
     meshroof->setNvm(meshroof);
     meshroof->sendDisconnect();
 
     shell = make_shared<MeshRoofShell>();
-    shell->setBanner(banner);
-    shell->setVersion(version);
-    shell->setBuilt(built);
-    shell->setCopyright(copyright);
     shell->setClient(meshroof);
     shell->setNvm(meshroof);
     shell->attach((void *) 1);
 
     shell2 = make_shared<MeshRoofShell>();
-    shell2->setBanner(banner);
-    shell2->setVersion(version);
-    shell2->setBuilt(built);
-    shell2->setCopyright(copyright);
     shell2->setClient(meshroof);
     shell2->setNvm(meshroof);
     shell2->attach((void *) 0);
