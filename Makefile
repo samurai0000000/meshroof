@@ -23,7 +23,19 @@ distclean:
 
 meshroof: build/meshroof.bin
 
+MESHROOF_TREE :=	\
+	CMakeLists.txt version.h.in \
+	$(wildcard *.cxx) $(wildcard *.hxx) \
+	main \
+	libmeshtastic
+
 build/meshroof.bin: build/Makefile sdkconfig
+	@if [ -f build/version.h ] && [ -n "`find -H $(MESHROOF_TREE) -type f \
+	    \( -name '*.c' -o -name '*.cxx' -o -name '*.h' -o -name '*.hxx' \
+	       -o -name 'CMakeLists.txt' -o -name 'version.h.in' \) \
+	    -newer build/version.h -print -quit`" ]; then \
+		rm -f build/version.h; \
+	fi
 	@$(MAKE) -C build
 
 build/Makefile: CMakeLists.txt
