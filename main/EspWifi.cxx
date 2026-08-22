@@ -30,6 +30,8 @@ EspWifi::EspWifi()
 {
     int ret;
 
+    resetStatus();
+
     esp_netif_init();
     esp_event_loop_create_default();
 

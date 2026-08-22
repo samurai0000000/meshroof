@@ -230,12 +230,18 @@ string MeshRoof::handleUnknown(uint32_t node_num, string &message)
 
 string MeshRoof::handleStatus(uint32_t node_num, string &message)
 {
-    string reply;
+    stringstream ss;
 
     (void)(node_num);
     (void)(message);
 
-    return reply;
+    ss << "amplify: " << (isAmplifying() ? "on" : "off") << endl;
+    ss << "reset count: " << getResetCount() << endl;
+    ss << "last reset: " << getLastResetSecsAgo() << " seconds ago" << endl;
+    ss << "cpu temperature: ";
+    ss << setprecision(3) << getCpuTempC();
+
+    return ss.str();
 }
 
 string MeshRoof::handleEnv(uint32_t node_num, string &message)
@@ -299,9 +305,9 @@ string MeshRoof::handleNet(uint32_t node_num, string &message)
     (void)(node_num);
 
     if (getIp() == 0) {
-        this->printf("(dhcp)\n");
+        ss << "(dhcp)" << endl;
     } else {
-        this->printf("(static ip)\n");
+        ss << "(static ip)" << endl;
     }
 
     snprintf(buf, sizeof(buf) - 1,
@@ -331,19 +337,46 @@ string MeshRoof::handleAmplify(uint32_t node_num, string &message)
     string reply;
 
     (void)(node_num);
-    (void)(message);
+
+    toLowercase(message);
+
+    if (message.empty()) {
+        reply = string("amplify: ") + (isAmplifying() ? "on" : "off");
+    } else if (message == "on") {
+        amplify(true);
+        reply = "amplify on";
+    } else if (message == "off") {
+        amplify(false);
+        reply = "amplify off";
+    } else {
+        reply = "syntax error!";
+    }
 
     return reply;
 }
 
 string MeshRoof::handleReset(uint32_t node_num, string &message)
 {
-    string reply;
+    stringstream ss;
 
     (void)(node_num);
-    (void)(message);
 
-    return reply;
+    toLowercase(message);
+
+    if (message.empty()) {
+        ss << "reset count: " << getResetCount();
+        if (getLastResetSecsAgo() != 0) {
+            ss << endl;
+            ss << "last reset: " << getLastResetSecsAgo() << " seconds ago";
+        }
+    } else if (message == "apply") {
+        reset();
+        ss << "ok";
+    } else {
+        ss << "syntax error!";
+    }
+
+    return ss.str();
 }
 
 string MeshRoof::handleBuzz(uint32_t node_num, string &message)

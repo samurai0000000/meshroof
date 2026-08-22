@@ -133,6 +133,9 @@ static void binder_task(__unused void *params)
     addr.sin_addr.s_addr = htonl(INADDR_ANY);
     addr.sin_port = htons(16876);
 
+    ret = 1;
+    setsockopt(server_sock, SOL_SOCKET, SO_REUSEADDR, &ret, sizeof(ret));
+
     ret = bind(server_sock, (struct sockaddr *) &addr, sizeof(addr));
     if (ret != 0) {
         ESP_LOGE(TAG, "bind ret=%d", ret);
@@ -269,7 +272,7 @@ static void meshtastic_task(__unused void *params)
             }
         }
 
-        taskYIELD();
+        vTaskDelay(pdMS_TO_TICKS(10));
     }
 }
 

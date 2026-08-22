@@ -4,6 +4,7 @@
  * Copyright (C) 2025, Charles Chiou
  */
 
+#include <stdexcept>
 #include <esp_timer.h>
 #include <esp_system.h>
 #include <esp_heap_caps.h>
@@ -574,6 +575,8 @@ int MeshRoofShell::amplify(int argc, char **argv)
 
 int MeshRoofShell::buzz(int argc, char **argv)
 {
+    int ret = 0;
+
     if (argc == 1) {
         meshroof->buzz();
     } else if ((argc == 2)) {
@@ -584,12 +587,17 @@ int MeshRoofShell::buzz(int argc, char **argv)
             meshroof->buzz(ms);
         } catch (const invalid_argument &e) {
             this->printf("syntax error!\n");
+            ret = -1;
+        } catch (const out_of_range &e) {
+            this->printf("syntax error!\n");
+            ret = -1;
         }
     } else {
         this->printf("syntax error!\n");
+        ret = -1;
     }
 
-    return -1;
+    return ret;
 }
 
 int MeshRoofShell::morse(int argc, char **argv)
