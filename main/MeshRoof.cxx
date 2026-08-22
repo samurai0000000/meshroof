@@ -14,6 +14,7 @@
 #include <esp_log.h>
 #include <nvs_flash.h>
 #include <nvs.h>
+#include <esp_crc.h>
 #include <driver/gpio.h>
 #include <driver/temperature_sensor.h>
 #include <sstream>
@@ -494,7 +495,7 @@ string MeshRoof::getNetIfPassword(void) const
 
 bool MeshRoof::setWifiSsid(const string &ssid)
 {
-    if (ssid.length() > sizeof(_main_body.wifi_ssid)) {
+    if (ssid.length() >= sizeof(_main_body.wifi_ssid)) {
         return false;
     }
 
@@ -506,7 +507,7 @@ bool MeshRoof::setWifiSsid(const string &ssid)
 
 bool MeshRoof::setWifiPasswd(const string &passwd)
 {
-    if (passwd.length() > sizeof(_main_body.wifi_passwd)) {
+    if (passwd.length() >= sizeof(_main_body.wifi_passwd)) {
         return false;
     }
 
@@ -608,7 +609,7 @@ bool MeshRoof::setDns3(const string &addr)
 
 bool MeshRoof::setNetIfPasswd(const string &passwd)
 {
-    if (passwd.length() > sizeof(_main_body.netif_passwd)) {
+    if (passwd.length() >= sizeof(_main_body.netif_passwd)) {
         return false;
     }
 
@@ -624,30 +625,68 @@ struct nvm_meta {
     size_t size;
 };
 
+static bool nvm_blob_size(uint32_t n_authchans, uint32_t n_admins,
+                          uint32_t n_mates, size_t *out)
+{
+    size_t size;
+    size_t add;
+
+    size = sizeof(struct nvm_header) + sizeof(struct nvm_main_body) +
+        sizeof(struct nvm_footer);
+
+    add = (size_t) n_authchans * sizeof(struct nvm_authchan_entry);
+    if ((n_authchans != 0) &&
+        ((add / sizeof(struct nvm_authchan_entry)) != n_authchans)) {
+        return false;
+    }
+    if (size > (((size_t) -1) - add)) {
+        return false;
+    }
+    size += add;
+
+    add = (size_t) n_admins * sizeof(struct nvm_admin_entry);
+    if ((n_admins != 0) &&
+        ((add / sizeof(struct nvm_admin_entry)) != n_admins)) {
+        return false;
+    }
+    if (size > (((size_t) -1) - add)) {
+        return false;
+    }
+    size += add;
+
+    add = (size_t) n_mates * sizeof(struct nvm_mate_entry);
+    if ((n_mates != 0) &&
+        ((add / sizeof(struct nvm_mate_entry)) != n_mates)) {
+        return false;
+    }
+    if (size > (((size_t) -1) - add)) {
+        return false;
+    }
+    size += add;
+
+    *out = size;
+    return true;
+}
+
 bool MeshRoof::loadNvm(void)
 {
     bool result = false;
+    bool nvs_opened = false;
     esp_err_t err;
-    nvs_handle_t handle;
-    uint8_t *buf;
+    nvs_handle_t handle = 0;
+    uint8_t *buf = NULL;
     size_t size = 0;
+    size_t need = 0;
     struct nvm_meta nvm_meta;
     const struct nvm_header *header = NULL;
     const struct nvm_main_body *main_body = NULL;
     const struct nvm_authchan_entry *authchans = NULL;
     const struct nvm_admin_entry *admins = NULL;
     const struct nvm_mate_entry *mates = NULL;
-    const struct nvm_footer *footer = NULL;
+    struct nvm_footer *footer = NULL;
+    uint32_t stored_crc;
+    uint32_t calc_crc;
     unsigned int i;
-
-
-    size = sizeof(struct nvm_header) + sizeof(struct nvm_main_body);
-    buf = (uint8_t *) malloc(size);
-    if (buf == NULL) {
-        ESP_LOGE(TAG, "malloc failed!");
-        result = false;
-        goto done;
-    }
 
     err = nvs_open("meshroof", NVS_READONLY, &handle);
     if (err != ESP_OK) {
@@ -655,6 +694,7 @@ bool MeshRoof::loadNvm(void)
         result = false;
         goto done;
     }
+    nvs_opened = true;
 
     size = sizeof(nvm_meta);
     err = nvs_get_blob(handle, "nvm_meta", &nvm_meta, &size);
@@ -664,8 +704,11 @@ bool MeshRoof::loadNvm(void)
         goto done;
     }
 
-    if (size > FLASH_TARGET_SIZE) {
-        ESP_LOGE(TAG, "Too big size=%zu!", size);
+    if ((nvm_meta.size < (sizeof(struct nvm_header) +
+                          sizeof(struct nvm_main_body) +
+                          sizeof(struct nvm_footer))) ||
+        (nvm_meta.size > FLASH_TARGET_SIZE)) {
+        ESP_LOGE(TAG, "Too big size=%zu!", nvm_meta.size);
         result = false;
         goto done;
     }
@@ -693,15 +736,14 @@ bool MeshRoof::loadNvm(void)
     }
     main_body = (const struct nvm_main_body *)
         (((const uint8_t *) header) + sizeof(*header));
-    size =
-        sizeof(struct nvm_header) +
-        sizeof(struct nvm_main_body) +
-        (main_body->n_authchans * sizeof(struct nvm_authchan_entry)) +
-        (main_body->n_admins * sizeof(struct nvm_admin_entry)) +
-        (main_body->n_mates * sizeof(struct nvm_mate_entry)) +
-        sizeof(struct nvm_footer);
-    if (size > FLASH_TARGET_SIZE) {
-        ESP_LOGE(TAG, "Too big size=%zu!", size);
+    if (nvm_blob_size(main_body->n_authchans, main_body->n_admins,
+                      main_body->n_mates, &need) == false) {
+        ESP_LOGE(TAG, "NVM size overflow!");
+        result = false;
+        goto done;
+    }
+    if ((need > FLASH_TARGET_SIZE) || (need != size)) {
+        ESP_LOGE(TAG, "Bad NVM size=%zu need=%zu!", size, need);
         result = false;
         goto done;
     }
@@ -713,11 +755,20 @@ bool MeshRoof::loadNvm(void)
     mates = (const struct nvm_mate_entry *)
         (((uint8_t *) admins) +
          (sizeof(struct nvm_admin_entry) * main_body->n_admins));
-    footer = (const struct nvm_footer *)
+    footer = (struct nvm_footer *)
         (((uint8_t *) mates) +
          (sizeof(struct nvm_mate_entry) * main_body->n_mates));
     if (footer->magic != NVM_FOOTER_MAGIC) {
         ESP_LOGE(TAG, "Wrong footer magic!");
+        result = false;
+        goto done;
+    }
+    stored_crc = footer->crc32;
+    footer->crc32 = 0;
+    calc_crc = esp_crc32_le(0, buf, (uint32_t) size);
+    footer->crc32 = stored_crc;
+    if ((stored_crc != 0) && (stored_crc != calc_crc)) {
+        ESP_LOGE(TAG, "Bad NVM crc32!");
         result = false;
         goto done;
     }
@@ -743,7 +794,9 @@ done:
         free(buf);
     }
 
-    nvs_close(handle);
+    if (nvs_opened) {
+        nvs_close(handle);
+    }
 
     return result;
 }
@@ -751,8 +804,9 @@ done:
 bool MeshRoof::saveNvm(void)
 {
     bool result = false;
+    bool nvs_opened = false;
     esp_err_t err;
-    nvs_handle_t handle;
+    nvs_handle_t handle = 0;
     uint8_t *buf = NULL;
     size_t size = 0;
     struct nvm_meta nvm_meta;
@@ -768,13 +822,16 @@ bool MeshRoof::saveNvm(void)
     _main_body.n_admins = nvmAdmins().size();
     _main_body.n_mates = nvmMates().size();
 
-    size =
-        sizeof(struct nvm_header) +
-        sizeof(struct nvm_main_body) +
-        (sizeof(struct nvm_authchan_entry) * _main_body.n_authchans) +
-        (sizeof(struct nvm_admin_entry) * _main_body.n_admins) +
-        (sizeof(struct nvm_mate_entry) * _main_body.n_mates) +
-        sizeof(struct nvm_footer);
+    if (nvm_blob_size(_main_body.n_authchans, _main_body.n_admins,
+                      _main_body.n_mates, &size) == false) {
+        result = false;
+        goto done;
+    }
+    if (size > FLASH_TARGET_SIZE) {
+        ESP_LOGE(TAG, "Too big size=%zu!", size);
+        result = false;
+        goto done;
+    }
 
     buf = (uint8_t *) malloc(size);
     if (buf == NULL) {
@@ -814,6 +871,7 @@ bool MeshRoof::saveNvm(void)
          (sizeof(struct nvm_mate_entry) * _main_body.n_mates));
     footer->magic = NVM_FOOTER_MAGIC;
     footer->crc32 = 0;
+    footer->crc32 = esp_crc32_le(0, buf, (uint32_t) size);
 
     err = nvs_open("meshroof", NVS_READWRITE, &handle);
     if (err != ESP_OK) {
@@ -821,6 +879,7 @@ bool MeshRoof::saveNvm(void)
         result = false;
         goto done;
     }
+    nvs_opened = true;
 
     nvm_meta.size = size;
     err = nvs_set_blob(handle, "nvm_meta", &nvm_meta, sizeof(nvm_meta));
@@ -852,7 +911,9 @@ done:
         free(buf);
     }
 
-    nvs_close(handle);
+    if (nvs_opened) {
+        nvs_close(handle);
+    }
 
     return result;
 }

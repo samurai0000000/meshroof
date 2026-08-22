@@ -112,7 +112,13 @@ int usb_vprintf(const char *format, va_list ap)
     char pbuf[SERIAL_PBUF_SIZE];
     int i;
 
-    ret = vsnprintf(pbuf, SERIAL_PBUF_SIZE - 1, format, ap);
+    ret = vsnprintf(pbuf, sizeof(pbuf), format, ap);
+    if (ret < 0) {
+        goto done;
+    }
+    if (ret >= (int) sizeof(pbuf)) {
+        ret = (int) sizeof(pbuf) - 1;
+    }
 
     if (usb_serial_jtag_is_connected() == false) {
         goto done;

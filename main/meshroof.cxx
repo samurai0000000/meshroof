@@ -135,7 +135,7 @@ static void binder_task(__unused void *params)
 
     ret = bind(server_sock, (struct sockaddr *) &addr, sizeof(addr));
     if (ret != 0) {
-        ESP_LOGE(TAG, "bind ret=%d", bind);
+        ESP_LOGE(TAG, "bind ret=%d", ret);
         goto done;
     }
 
@@ -306,7 +306,6 @@ extern "C" void app_main(void)
     shell2 = make_shared<MeshRoofShell>();
     shell2->setClient(meshroof);
     shell2->setNvm(meshroof);
-    shell2->attach((void *) 0);
     shell2->setNoEcho(true);
     meshroof->addPrintfCallback(shell2.get(), shell->ctx_vprintf);
 

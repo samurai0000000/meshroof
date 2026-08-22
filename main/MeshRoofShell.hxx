@@ -19,6 +19,8 @@ public:
     MeshRoofShell(shared_ptr<SimpleClient> client = NULL);
     ~MeshRoofShell();
 
+    virtual int process(void);
+
 protected:
 
     virtual int tx_write(const uint8_t *buf, size_t size);

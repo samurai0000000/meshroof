@@ -37,12 +37,23 @@ MeshRoofShell::~MeshRoofShell()
 
 }
 
+int MeshRoofShell::process(void)
+{
+    if (_ctx == NULL) {
+        return -1;
+    }
+
+    return SimpleShell::process();
+}
+
 int MeshRoofShell::tx_write(const uint8_t *buf, size_t size)
 {
     int ret = 0;
     uint32_t ctx = (uint32_t) _ctx;
 
-    if (ctx == 1) {
+    if (ctx == 0) {
+        ret = (int) size;
+    } else if (ctx == 1) {
         ret = usb_tx_write(buf, size);
     } else {
         int tcp_fd = (ctx & 0x7fffffff);
@@ -59,7 +70,9 @@ int MeshRoofShell::printf(const char *format, ...)
     va_list ap;
     char *buf = NULL;
 
-    if (ctx == 1) {
+    if (ctx == 0) {
+        ret = 0;
+    } else if (ctx == 1) {
         va_start(ap, format);
         ret = usb_vprintf(format, ap);
         va_end(ap);
@@ -76,6 +89,13 @@ int MeshRoofShell::printf(const char *format, ...)
         va_start(ap, format);
         len = vsnprintf(buf, 512 - 1, format, ap);
         va_end(ap);
+        if (len < 0) {
+            ret = -1;
+            goto done;
+        }
+        if (len > (512 - 2)) {
+            len = 512 - 2;
+        }
 
         s = buf;
         while (len > 0) {
@@ -86,7 +106,7 @@ int MeshRoofShell::printf(const char *format, ...)
             }
 
             len -= ret;
-            s += len;
+            s += ret;
         }
     }
 
@@ -104,7 +124,9 @@ int MeshRoofShell::rx_ready(void) const
     int ret = 0;
     uint32_t ctx = (uint32_t) _ctx;
 
-    if (ctx == 1) {
+    if (ctx == 0) {
+        ret = 0;
+    } else if (ctx == 1) {
         ret = usb_rx_ready();
     } else {
         ret = 1;
@@ -118,7 +140,9 @@ int MeshRoofShell::rx_read(uint8_t *buf, size_t size)
     int ret = 0;
     uint32_t ctx = (uint32_t) _ctx;
 
-    if (ctx == 1) {
+    if (ctx == 0) {
+        ret = -1;
+    } else if (ctx == 1) {
         ret = usb_rx_read_timeout(buf, size, pdMS_TO_TICKS(100));
     } else {
         int tcp_fd = (ctx & 0x7fffffff);
@@ -135,6 +159,9 @@ int MeshRoofShell::rx_read(uint8_t *buf, size_t size)
 
         if (ret > 0) {
             ret = read(tcp_fd, buf, size);
+            if (ret == 0) {
+                ret = -1;
+            }
         }
     }
 
@@ -188,9 +215,11 @@ int MeshRoofShell::exit(int argc, char **argv)
 {
     uint32_t ctx = (uint32_t) _ctx;
 
+    (void)(argc);
+    (void)(argv);
+
     if (ctx != 1) {
-        int tcp_fd = (ctx & 0x7fffffff);
-        close(tcp_fd);
+        _ctx = NULL;
     }
 
     return 0;
