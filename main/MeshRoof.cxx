@@ -197,12 +197,15 @@ void MeshRoof::gotTraceRoute(const meshtastic_MeshPacket &packet,
     SimpleClient::gotTraceRoute(packet, routeDiscovery);
 }
 
-string MeshRoof::handleUnknown(uint32_t node_num, string &message)
+string MeshRoof::handleUnknown(uint32_t node_num, uint32_t dest,
+                               uint8_t channel, string &message)
 {
     string reply;
     string first_word;
 
     (void)(node_num);
+    (void)(dest);
+    (void)(channel);
 
     first_word = message.substr(0, message.find(' '));
     toLowercase(first_word);
