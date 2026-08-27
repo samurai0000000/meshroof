@@ -171,6 +171,13 @@ int MeshRoofShell::rx_read(uint8_t *buf, size_t size)
 
 int MeshRoofShell::system(int argc, char **argv)
 {
+    if ((argc >= 2) &&
+        ((strcmp(argv[1], "-h") == 0) || (strcmp(argv[1], "--help") == 0))) {
+        this->printf("Usage: %s [-h|--help] [-v]\n", argv[0]);
+        this->printf("  Display system uptime, heap, CPU temperature, and FreeRTOS tasks.\n");
+        return 0;
+    }
+
     size_t total_heap = heap_caps_get_total_size(MALLOC_CAP_INTERNAL);
     size_t free_heap = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
     size_t used_heap = total_heap - free_heap;
@@ -193,6 +200,13 @@ int MeshRoofShell::system(int argc, char **argv)
 
 int MeshRoofShell::reboot(int argc, char **argv)
 {
+    if ((argc >= 2) &&
+        ((strcmp(argv[1], "-h") == 0) || (strcmp(argv[1], "--help") == 0))) {
+        this->printf("Usage: %s [-h|--help]\n", argv[0]);
+        this->printf("  Reboot the system.\n");
+        return 0;
+    }
+
     (void)(argc);
     (void)(argv);
 
@@ -214,6 +228,13 @@ int MeshRoofShell::nvm(int argc, char **argv)
 
 int MeshRoofShell::exit(int argc, char **argv)
 {
+    if ((argc >= 2) &&
+        ((strcmp(argv[1], "-h") == 0) || (strcmp(argv[1], "--help") == 0))) {
+        this->printf("Usage: %s [-h|--help]\n", argv[0]);
+        this->printf("  Exit current shell session.\n");
+        return 0;
+    }
+
     uint32_t ctx = (uint32_t) _ctx;
 
     (void)(argc);
@@ -230,6 +251,19 @@ int MeshRoofShell::wifi(int argc, char **argv)
 {
     int ret = 0;
     shared_ptr<EspWifi> wifi = meshroof->espWifi();
+
+    if ((argc >= 2) &&
+        ((strcmp(argv[1], "-h") == 0) || (strcmp(argv[1], "--help") == 0))) {
+        this->printf("Usage: %s [-h|--help] [command] [args...]\n", argv[0]);
+        this->printf("  Manage WiFi connection and credentials.\n");
+        this->printf("Commands:\n");
+        this->printf("  wifi                         Show current WiFi connection status\n");
+        this->printf("  wifi nvm                     Show stored SSID and password\n");
+        this->printf("  wifi start|stop|apply        Start, stop, or restart WiFi\n");
+        this->printf("  wifi ssid <name>             Set WiFi SSID\n");
+        this->printf("  wifi passwd <secret>         Set WiFi password\n");
+        return 0;
+    }
 
     if (argc == 1) {
         const wifi_event_sta_connected_t *sta_connected =
@@ -289,6 +323,20 @@ int MeshRoofShell::wifi(int argc, char **argv)
 int MeshRoofShell::net(int argc, char **argv)
 {
     int ret = 0;
+
+    if ((argc >= 2) &&
+        ((strcmp(argv[1], "-h") == 0) || (strcmp(argv[1], "--help") == 0))) {
+        this->printf("Usage: %s [-h|--help] [command] [args...]\n", argv[0]);
+        this->printf("  Manage IP network settings and DNS.\n");
+        this->printf("Commands:\n");
+        this->printf("  net                                    Show active IP config and DNS\n");
+        this->printf("  net nvm                                Show stored IP config\n");
+        this->printf("  net apply                              Apply network settings\n");
+        this->printf("  net ip dhcp                            Configure dynamic IP (DHCP)\n");
+        this->printf("  net ip <ip> netmask <mask> gw <gw>     Configure static IP\n");
+        this->printf("  net dns1|dns2|dns3 <ip>                Set DNS server IP\n");
+        return 0;
+    }
 
     if (argc == 1) {
         const esp_netif_ip_info_t *ip_info =
@@ -451,6 +499,13 @@ int MeshRoofShell::ping(int argc, char **argv)
 {
     int ret = 0;
     ip_addr_t target_addr;
+
+    if ((argc >= 2) &&
+        ((strcmp(argv[1], "-h") == 0) || (strcmp(argv[1], "--help") == 0))) {
+        this->printf("Usage: %s [-h|--help] <host>\n", argv[0]);
+        this->printf("  Send ICMP ECHO requests to network host until Ctrl-C.\n");
+        return 0;
+    }
     struct addrinfo hint;
     struct addrinfo *res = NULL;
     struct in_addr addr4;
@@ -557,6 +612,16 @@ int MeshRoofShell::amplify(int argc, char **argv)
 {
     int ret = 0;
 
+    if ((argc >= 2) &&
+        ((strcmp(argv[1], "-h") == 0) || (strcmp(argv[1], "--help") == 0))) {
+        this->printf("Usage: %s [-h|--help] [on|off]\n", argv[0]);
+        this->printf("  Control RF amplifier or show state.\n");
+        this->printf("Commands:\n");
+        this->printf("  amplify                      Show amplifier state\n");
+        this->printf("  amplify on|off               Turn RF amplifier on or off\n");
+        return 0;
+    }
+
     if (argc == 1) {
         this->printf("amplify: %s\n", meshroof->isAmplifying() ? "on" : "off");
     } else if ((argc == 2) && (strcmp(argv[1], "on") == 0)) {
@@ -576,6 +641,15 @@ int MeshRoofShell::amplify(int argc, char **argv)
 int MeshRoofShell::buzz(int argc, char **argv)
 {
     int ret = 0;
+
+    if ((argc >= 2) &&
+        ((strcmp(argv[1], "-h") == 0) || (strcmp(argv[1], "--help") == 0))) {
+        this->printf("Usage: %s [-h|--help] [duration_ms]\n", argv[0]);
+        this->printf("  Play buzzer tone.\n");
+        this->printf("Arguments:\n");
+        this->printf("  duration_ms   Tone duration in milliseconds (default: 100)\n");
+        return 0;
+    }
 
     if (argc == 1) {
         meshroof->buzz();
@@ -602,6 +676,15 @@ int MeshRoofShell::buzz(int argc, char **argv)
 
 int MeshRoofShell::morse(int argc, char **argv)
 {
+    if ((argc >= 2) &&
+        ((strcmp(argv[1], "-h") == 0) || (strcmp(argv[1], "--help") == 0))) {
+        this->printf("Usage: %s [-h|--help] <text>\n", argv[0]);
+        this->printf("  Transmit text message as audible Morse code on the buzzer.\n");
+        this->printf("Arguments:\n");
+        this->printf("  text          Text string to play in Morse code\n");
+        return 0;
+    }
+
     string text;
 
     for (int i = 1; i < argc; i++) {
@@ -616,6 +699,16 @@ int MeshRoofShell::morse(int argc, char **argv)
 int MeshRoofShell::reset(int argc, char **argv)
 {
     int ret = 0;
+
+    if ((argc >= 2) &&
+        ((strcmp(argv[1], "-h") == 0) || (strcmp(argv[1], "--help") == 0))) {
+        this->printf("Usage: %s [-h|--help] [apply]\n", argv[0]);
+        this->printf("  Show reset statistics or trigger system reset.\n");
+        this->printf("Commands:\n");
+        this->printf("  reset         Display reset count and time since last reset\n");
+        this->printf("  reset apply   Trigger immediate system reset\n");
+        return 0;
+    }
 
     if (argc == 1) {
         time_t now, last;
