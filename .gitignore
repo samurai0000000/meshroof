@@ -1,5 +1,5 @@
 build/
-.agent
+.agents
 .cursor
 sdkconfig
 sdkconfig.*
