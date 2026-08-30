@@ -144,6 +144,15 @@ public:
     bool setDns3(const string &addr);
     bool setNetIfPasswd(const string &passwd);
 
+    virtual void setNvm(shared_ptr<BaseNvm> nvm) {
+        SimpleClient::setNvm(nvm);
+        HomeChat::setNvm(nvm);
+    }
+
+    virtual void setClient(shared_ptr<SimpleClient> client) {
+        HomeChat::setClient(client);
+    }
+
     virtual bool loadNvm(void);
     virtual bool saveNvm(void);
     bool applyNvmToHomeChat(void);

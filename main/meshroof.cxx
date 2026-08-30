@@ -188,7 +188,6 @@ static void meshtastic_task(__unused void *params)
 {
     int ret;
     time_t now, last_want_config, last_heartbeat;
-    bool announced_up = false;
     esp_err_t err;
     esp_task_wdt_config_t twdt_config = {
         .timeout_ms = 15000,
@@ -271,33 +270,6 @@ static void meshtastic_task(__unused void *params)
             if (ret != 0) {
                 usb_printf("mt_serial_process failed!\n");
                 break;
-            }
-        }
-
-        if (meshroof->isConnected() && !announced_up) {
-            if (meshroof->nvmAuthchans().empty()) {
-                announced_up = true;
-            } else {
-                const struct nvm_authchan_entry &ac =
-                    meshroof->nvmAuthchans()[0];
-                string chanName(ac.name, strnlen(ac.name, sizeof(ac.name)));
-                uint8_t channel = meshroof->getChannel(chanName);
-                string announcement;
-
-                if (channel == 0xffU) {
-                    announced_up = true;
-                } else {
-                    announcement = meshroof->lookupLongName(meshroof->whoami(), true);
-                    if (announcement.empty()) {
-                        announcement = meshroof->whoamiString();
-                    }
-                    announcement += " is up";
-                    if (meshroof->textMessage(0xffffffffU, channel, announcement)) {
-                        announced_up = true;
-                    } else {
-                        usb_printf("boot announce failed!\n");
-                    }
-                }
             }
         }
 
