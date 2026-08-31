@@ -253,10 +253,10 @@ string MeshRoof::handleEnv(uint32_t node_num, string &message)
 
     ss << HomeChat::handleEnv(node_num, message);
     if (!ss.str().empty()) {
-        ss << endl;
+        ss << " ";
     }
 
-    ss << "cpu temperature: ";
+    ss << "temp_cpu=";
     ss <<  setprecision(3) << getCpuTempC();
 
     return ss.str();
