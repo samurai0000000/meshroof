@@ -271,26 +271,26 @@ string MeshRoof::handleWifi(uint32_t node_num, string &message)
     (void)(node_num);
 
     if (sta_connected->bssid[0] == 0x0) {
-        ss << "Wifi not connected";
+        ss << "wifi: connected=no";
     } else {
         char buf[40];
 
         bzero(buf, sizeof(buf));
         memcpy(buf, sta_connected->ssid,
                min((size_t) sta_connected->ssid_len, sizeof(buf)));
-        ss << "Wifi is connected" << endl;
-        ss << "ssid: " << buf << endl;
+        ss << "wifi: connected=yes";
+        ss << " ssid=" << buf;
         snprintf(buf, sizeof(buf) - 1,
-                 "bssid: %.2x:%.2x:%.2x:%.2x:%.2x:%.2x",
+                 " bssid=%.2x:%.2x:%.2x:%.2x:%.2x:%.2x",
                  sta_connected->bssid[0],
                  sta_connected->bssid[1],
                  sta_connected->bssid[2],
                  sta_connected->bssid[3],
                  sta_connected->bssid[4],
                  sta_connected->bssid[5]);
-        ss << buf << endl;
-        ss << "channel: " << (int) sta_connected->channel << endl;
-        ss << "rssi: " << espWifi()->getRssi();
+        ss << buf;
+        ss << " chan=" << (int) sta_connected->channel;
+        ss << " rssi=" << espWifi()->getRssi();
     }
 
     return ss.str();
@@ -307,29 +307,25 @@ string MeshRoof::handleNet(uint32_t node_num, string &message)
 
     (void)(node_num);
 
-    if (getIp() == 0) {
-        ss << "(dhcp)" << endl;
-    } else {
-        ss << "(static ip)" << endl;
-    }
+    ss << (getIp() == 0 ? "net: mode=dhcp" : "net: mode=static");
 
     snprintf(buf, sizeof(buf) - 1,
-             "ip:      " IPSTR, IP2STR(&ip_info->ip));
-    ss << buf << endl;
+             " ip=" IPSTR, IP2STR(&ip_info->ip));
+    ss << buf;
     snprintf(buf, sizeof(buf) - 1,
-             "netmask: " IPSTR, IP2STR(&ip_info->netmask));
-    ss << buf << endl;
+             " mask=" IPSTR, IP2STR(&ip_info->netmask));
+    ss << buf;
     snprintf(buf, sizeof(buf) - 1,
-             "gateway: " IPSTR, IP2STR(&ip_info->gw));
-    ss << buf << endl;
+             " gw=" IPSTR, IP2STR(&ip_info->gw));
+    ss << buf;
     snprintf(buf, sizeof(buf) - 1,
-             "dns1:    " IPSTR, IP2STR(&dns1_info->ip.u_addr.ip4));
-    ss << buf << endl;
+             " dns1=" IPSTR, IP2STR(&dns1_info->ip.u_addr.ip4));
+    ss << buf;
     snprintf(buf, sizeof(buf) - 1,
-             "dns2:    " IPSTR, IP2STR(&dns2_info->ip.u_addr.ip4));
-    ss << buf << endl;
+             " dns2=" IPSTR, IP2STR(&dns2_info->ip.u_addr.ip4));
+    ss << buf;
     snprintf(buf, sizeof(buf) - 1,
-             "dns3:    " IPSTR, IP2STR(&dns3_info->ip.u_addr.ip4));
+             " dns3=" IPSTR, IP2STR(&dns3_info->ip.u_addr.ip4));
     ss << buf;
 
     return ss.str();
@@ -344,13 +340,13 @@ string MeshRoof::handleAmplify(uint32_t node_num, string &message)
     toLowercase(message);
 
     if (message.empty()) {
-        reply = string("amplify: ") + (isAmplifying() ? "on" : "off");
+        reply = string("amplify: pwr=") + (isAmplifying() ? "on" : "off");
     } else if (message == "on") {
         amplify(true);
-        reply = "amplify on";
+        reply = "amplify: pwr=on";
     } else if (message == "off") {
         amplify(false);
-        reply = "amplify off";
+        reply = "amplify: pwr=off";
     } else {
         reply = "syntax error!";
     }
@@ -367,14 +363,13 @@ string MeshRoof::handleReset(uint32_t node_num, string &message)
     toLowercase(message);
 
     if (message.empty()) {
-        ss << "reset count: " << getResetCount();
+        ss << "reset: count=" << getResetCount();
         if (getLastResetSecsAgo() != 0) {
-            ss << endl;
-            ss << "last reset: " << getLastResetSecsAgo() << " seconds ago";
+            ss << " last=" << getLastResetSecsAgo() << "s";
         }
     } else if (message == "apply") {
         reset();
-        ss << "ok";
+        ss << "reset: applied=yes";
     } else {
         ss << "syntax error!";
     }
@@ -402,7 +397,7 @@ string MeshRoof::handleMorse(uint32_t node_num, string &message)
     (void)(message);
 
     addMorseText(message);
-    reply = "buzzing morse code: '" + message + "'";
+    reply = "morse: msg=" + message;
 
     return reply;
 }
