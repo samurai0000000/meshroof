@@ -49,3 +49,17 @@ Controls external Power Amplifier (PA) / Low Noise Amplifier (LNA) front-ends fo
     ```
 - **`status`**:
   - Reports operational status including rooftop solar/battery power supply conditions.
+
+---
+
+## 5. HomeMesh Auto-Discovery (`identify`)
+
+`meshroof` reports machine-readable capabilities for `meshmon` / Home Assistant registration.
+
+* **MeshMon probe**: `identify` (typically `!nodeid identify` or `all identify` on the robot channel).
+  * HomeChat addressing (node hex, short name, long name, `meshroof`, or `all`) selects who replies.
+* **Structured Response**:
+  ```text
+  identify: app=meshroof ver=2.1.4 hw=esp32s3 caps=amplify,wifi,net,cpu_temp,buzzer
+  ```
+* **HomeChat `rollcall [target]`**: still supported for human rollcall and still returns `rollcall: app=meshroof …`. MeshMon does not use `rollcall` for fleet probing.

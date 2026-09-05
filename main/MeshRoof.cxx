@@ -349,6 +349,11 @@ string MeshRoof::handleUnknown(uint32_t node_num, uint32_t dest,
         reply = handleStatus(node_num, message);
     } else if (first_word == "rollcall") {
         reply = handleRollcall(node_num, message);
+    } else if (first_word == "identify") {
+        reply = handleRollcall(node_num, message);
+        if (reply.compare(0, 9, "rollcall:") == 0) {
+            reply.replace(0, 8, "identify");
+        }
     } else if (first_word == "wifi") {
         reply = handleWifi(node_num, message);
     } else if (first_word == "net") {
@@ -391,7 +396,7 @@ string MeshRoof::handleRollcall(uint32_t node_num, string &message)
         }
     }
 
-    return "rollcall: app=meshroof ver=2.1.3 hw=esp32s3 caps=amplify,wifi,net,cpu_temp,buzzer";
+    return "rollcall: app=meshroof ver=2.1.4 hw=esp32s3 caps=amplify,wifi,net,cpu_temp,buzzer";
 }
 
 string MeshRoof::handleStatus(uint32_t node_num, string &message)

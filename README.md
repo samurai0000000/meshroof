@@ -12,7 +12,7 @@
   <img src="https://img.shields.io/badge/Platform-ESP32--S3-blue.svg" alt="ESP32-S3" />
   <img src="https://img.shields.io/badge/Framework-ESP--IDF%20v5.x-red.svg" alt="ESP-IDF" />
   <img src="https://img.shields.io/badge/Protocol-Meshtastic%20%2F%20HomeChat-green.svg" alt="Meshtastic / HomeChat" />
-  <img src="https://img.shields.io/badge/Version-2.1.3-orange.svg" alt="Version 2.1.3" />
+  <img src="https://img.shields.io/badge/Version-2.1.4-orange.svg" alt="Version 2.1.4" />
 </p>
 
 ---
@@ -28,6 +28,7 @@ Operating as a node on the Meshtastic mesh network, MeshRoof receives direct mes
 ## Key Features
 
 - **Meshtastic & HomeChat Integration**: Full communication bridge using `libmeshtastic` and `HomeChat`, supporting node discovery, encrypted DM handling, and telemetry.
+- **HomeMesh Auto-Discovery (`identify`)**: Answers MeshMon `!nodeid identify` with `identify: app=meshroof ver=2.1.4 hw=esp32s3 caps=amplify,wifi,net,cpu_temp,buzzer` for Home Assistant entity registration.
 - **RF Power Amplifier & Antenna Control**: GPIO-driven switching for external bi-directional Power Amplifiers (PA) / Low-Noise Amplifiers (LNA) and antenna paths.
 - **Dual Console Management**: Interactive command shells available over both USB Serial/JTAG and TCP socket (port `16876`), complete with `-h`/`--help` documentation and telnet IAC control.
 - **Persistent NVM Configuration**: Onboard flash storage (NVS) for WiFi credentials, static/DHCP IP configurations, authentication channels, and administrator keys.
@@ -73,6 +74,7 @@ MeshRoof responds to direct messages and channel broadcasts using the **HomeChat
 
 | Command | Description | Example Reply |
 | :--- | :--- | :--- |
+| `identify` | HomeMesh capability probe (`!id identify` / `all identify`) | `identify: app=meshroof ver=2.1.4 hw=esp32s3 caps=…` |
 | `wifi` | Query WiFi connection state, SSID, RSSI, and IP | `wifi: status=connected ssid=HomeMesh rssi=-62 ip=192.168.1.150` |
 | `net` | Query IP address, gateway, and DNS configuration | `net: ip=192.168.1.150 gw=192.168.1.1 dns=1.1.1.1` |
 | `net ping <host>` | Send ICMP ping echo to host or IP | `net: ping=1.1.1.1 rtt=18ms` |

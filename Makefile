@@ -7,6 +7,34 @@ MAKEFLAGS =	--no-print-dir
 IDF_PATH :=	$(realpath esp-idf)
 export IDF_PATH
 
+# Make cannot source a script into its own process. If export.sh was not
+# sourced (IDF_PYTHON_ENV_PATH unset), re-enter this Makefile from bash
+# after sourcing it quietly.
+ifeq ($(or $(IDF_PYTHON_ENV_PATH),$(IDF_EXPORTED)),)
+
+.PHONY: _idf_export
+_idf_export:
+	@if [ ! -f "$(IDF_PATH)/export.sh" ]; then \
+		echo "ESP-IDF export.sh not found at $(IDF_PATH)/export.sh" >&2; \
+		exit 1; \
+	fi
+	@bash -c 'if ! . "$(IDF_PATH)/export.sh" >/dev/null 2>&1; then \
+		echo "Failed to source $(IDF_PATH)/export.sh" >&2; \
+		. "$(IDF_PATH)/export.sh"; \
+		exit 1; \
+	fi; \
+	exec $(MAKE) IDF_EXPORTED=1 $(MAKECMDGOALS)'
+
+ifeq ($(MAKECMDGOALS),)
+.DEFAULT_GOAL :=	_idf_export
+else
+.PHONY: $(MAKECMDGOALS)
+$(MAKECMDGOALS): _idf_export
+	@:
+endif
+
+else
+
 TARGETS +=	build/meshroof.bin
 
 .PHONY: default clean distclean $(TARGETS)
@@ -71,3 +99,5 @@ flash: build/Makefile
 reset:
 	@esptool.py --port $(ESPPORT) \
 		--before default_reset --after hard_reset chip_id
+
+endif
