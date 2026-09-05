@@ -12,6 +12,12 @@
 #include <arpa/inet.h>
 #include <netinet/in.h>
 #include <esp_log.h>
+#include <esp_rom_sys.h>
+#include <esp_system.h>
+#include <esp_timer.h>
+#include <ping/ping_sock.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/semphr.h>
 #include <nvs_flash.h>
 #include <nvs.h>
 #include <esp_crc.h>
@@ -30,6 +36,7 @@ MeshRoof::MeshRoof()
 {
     bzero(&_main_body, sizeof(_main_body));
     _isAmplifying = false;
+    _amplifierGain = "high";
     _resetCount = 0;
     _lastReset = time(NULL);
 
@@ -82,6 +89,21 @@ bool MeshRoof::isAmplifying(void) const
     return _isAmplifying;
 }
 
+string MeshRoof::getAmplifierGain(void) const
+{
+    return _amplifierGain.empty() ? "high" : _amplifierGain;
+}
+
+void MeshRoof::setAmplifierGain(const string &gain)
+{
+    _amplifierGain = gain;
+}
+
+string MeshRoof::getAmplifierPower(void) const
+{
+    return _isAmplifying ? "27dBm" : "0dBm";
+}
+
 void MeshRoof::reset(void)
 {
     _resetCount++;
@@ -121,6 +143,28 @@ void MeshRoof::buzz(unsigned int ms)
     gpio_set_level(BUZZER_PIN, false);
 }
 
+void MeshRoof::buzz(unsigned int freq, unsigned int ms)
+{
+    if (freq == 0 || ms == 0) {
+        buzz(ms > 0 ? ms : 200);
+        return;
+    }
+
+    int64_t start = esp_timer_get_time();
+    int64_t duration_us = (int64_t) ms * 1000;
+    int half_period_us = 1000000 / (freq * 2);
+    if (half_period_us < 50) {
+        half_period_us = 50;
+    }
+
+    while ((esp_timer_get_time() - start) < duration_us) {
+        gpio_set_level(BUZZER_PIN, 1);
+        esp_rom_delay_us(half_period_us);
+        gpio_set_level(BUZZER_PIN, 0);
+        esp_rom_delay_us(half_period_us);
+    }
+}
+
 void MeshRoof::buzzMorseCode(const string &text, bool clearPrevious)
 {
     if (clearPrevious) {
@@ -128,6 +172,95 @@ void MeshRoof::buzzMorseCode(const string &text, bool clearPrevious)
     }
 
     this->addMorseText(text);
+}
+
+struct PingSyncCtx {
+    SemaphoreHandle_t sem;
+    bool success;
+    uint32_t rtt;
+    esp_ip_addr_t target_addr;
+};
+
+static void ping_sync_success(esp_ping_handle_t hdl, void *args)
+{
+    PingSyncCtx *ctx = (PingSyncCtx *) args;
+    esp_ping_get_profile(hdl, ESP_PING_PROF_TIMEGAP, &ctx->rtt, sizeof(ctx->rtt));
+    esp_ping_get_profile(hdl, ESP_PING_PROF_IPADDR, &ctx->target_addr, sizeof(ctx->target_addr));
+    ctx->success = true;
+}
+
+static void ping_sync_timeout(esp_ping_handle_t hdl, void *args)
+{
+    PingSyncCtx *ctx = (PingSyncCtx *) args;
+    ctx->success = false;
+}
+
+static void ping_sync_end(esp_ping_handle_t hdl, void *args)
+{
+    PingSyncCtx *ctx = (PingSyncCtx *) args;
+    if (ctx->sem) {
+        xSemaphoreGive(ctx->sem);
+    }
+}
+
+bool MeshRoof::pingHost(const string &host, string &result_ip, uint32_t &rtt_ms)
+{
+    struct addrinfo hint;
+    struct addrinfo *res = NULL;
+    struct in_addr addr4;
+    ip_addr_t target_addr;
+    esp_ping_config_t ping_config;
+    esp_ping_callbacks_t cbs;
+    esp_ping_handle_t hdl = NULL;
+    PingSyncCtx ctx;
+    bool ok = false;
+
+    memset(&hint, 0, sizeof(hint));
+    memset(&target_addr, 0, sizeof(target_addr));
+
+    if (getaddrinfo(host.c_str(), NULL, &hint, &res) != 0 || res == NULL) {
+        return false;
+    }
+
+    addr4 = ((struct sockaddr_in *) (res->ai_addr))->sin_addr;
+    inet_addr_to_ip4addr(ip_2_ip4(&target_addr), &addr4);
+    freeaddrinfo(res);
+
+    ctx.sem = xSemaphoreCreateBinary();
+    if (ctx.sem == NULL) {
+        return false;
+    }
+    ctx.success = false;
+    ctx.rtt = 0;
+    memset(&ctx.target_addr, 0, sizeof(ctx.target_addr));
+
+    ping_config = ESP_PING_DEFAULT_CONFIG();
+    ping_config.target_addr = target_addr;
+    ping_config.count = 1;
+    ping_config.timeout_ms = 1500;
+
+    cbs.on_ping_success = ping_sync_success;
+    cbs.on_ping_timeout = ping_sync_timeout;
+    cbs.on_ping_end = ping_sync_end;
+    cbs.cb_args = &ctx;
+
+    if (esp_ping_new_session(&ping_config, &cbs, &hdl) == ESP_OK) {
+        if (esp_ping_start(hdl) == ESP_OK) {
+            xSemaphoreTake(ctx.sem, pdMS_TO_TICKS(2000));
+            esp_ping_stop(hdl);
+        }
+        esp_ping_delete_session(hdl);
+    }
+
+    vSemaphoreDelete(ctx.sem);
+
+    if (ctx.success) {
+        result_ip = inet_ntoa(ctx.target_addr.u_addr.ip4);
+        rtt_ms = ctx.rtt;
+        ok = true;
+    }
+
+    return ok;
 }
 
 bool MeshRoof::isOnboardLedOn(void) const
@@ -214,6 +347,8 @@ string MeshRoof::handleUnknown(uint32_t node_num, uint32_t dest,
 
     if (first_word == "status") {
         reply = handleStatus(node_num, message);
+    } else if (first_word == "rollcall") {
+        reply = handleRollcall(node_num, message);
     } else if (first_word == "wifi") {
         reply = handleWifi(node_num, message);
     } else if (first_word == "net") {
@@ -231,6 +366,34 @@ string MeshRoof::handleUnknown(uint32_t node_num, uint32_t dest,
     return reply;
 }
 
+string MeshRoof::handleRollcall(uint32_t node_num, string &message)
+{
+    (void)(node_num);
+    string target = message;
+    trimWhitespace(target);
+
+    if (!target.empty()) {
+        toLowercase(target);
+        uint32_t my_num = _client != NULL ? _client->whoami() : 0;
+        string short_name = _client != NULL ? _client->lookupShortName(my_num) : "";
+        string long_name = _client != NULL ? _client->lookupLongName(my_num) : "";
+        toLowercase(short_name);
+        toLowercase(long_name);
+
+        char hex1[16], hex2[16];
+        snprintf(hex1, sizeof(hex1), "!%08lx", (unsigned long) my_num);
+        snprintf(hex2, sizeof(hex2), "0x%08lx", (unsigned long) my_num);
+
+        if (target != hex1 && target != hex2 &&
+            target != short_name && target != long_name &&
+            target != "all" && target != "meshroof") {
+            return "";  // Target does not match this node, remain silent
+        }
+    }
+
+    return "rollcall: app=meshroof ver=2.1.3 hw=esp32s3 caps=amplify,wifi,net,cpu_temp,buzzer";
+}
+
 string MeshRoof::handleStatus(uint32_t node_num, string &message)
 {
     stringstream ss;
@@ -238,11 +401,12 @@ string MeshRoof::handleStatus(uint32_t node_num, string &message)
     (void)(node_num);
     (void)(message);
 
-    ss << "amplify: " << (isAmplifying() ? "on" : "off") << endl;
-    ss << "reset count: " << getResetCount() << endl;
-    ss << "last reset: " << getLastResetSecsAgo() << " seconds ago" << endl;
-    ss << "cpu temperature: ";
-    ss << setprecision(3) << getCpuTempC();
+    ss << "status: amplify=" << (isAmplifying() ? "on" : "off")
+       << " gain=" << getAmplifierGain()
+       << " pa=" << getAmplifierPower()
+       << " reset_count=" << getResetCount()
+       << " last_reset=" << getLastResetSecsAgo() << "s"
+       << " temp_chip=" << fixed << setprecision(1) << getCpuTempC();
 
     return ss.str();
 }
@@ -256,8 +420,8 @@ string MeshRoof::handleEnv(uint32_t node_num, string &message)
         ss << " ";
     }
 
-    ss << "temp_cpu=";
-    ss <<  setprecision(3) << getCpuTempC();
+    ss << "temp_chip=";
+    ss << fixed << setprecision(1) << getCpuTempC();
 
     return ss.str();
 }
@@ -267,30 +431,25 @@ string MeshRoof::handleWifi(uint32_t node_num, string &message)
     stringstream ss;
     const wifi_event_sta_connected_t *sta_connected =
         espWifi()->getStaConnected();
+    const esp_netif_ip_info_t *ip_info = espWifi()->getIpInfo();
 
     (void)(node_num);
+    (void)(message);
 
     if (sta_connected->bssid[0] == 0x0) {
-        ss << "wifi: connected=no";
+        ss << "wifi: status=disconnected";
     } else {
         char buf[40];
 
         bzero(buf, sizeof(buf));
         memcpy(buf, sta_connected->ssid,
                min((size_t) sta_connected->ssid_len, sizeof(buf)));
-        ss << "wifi: connected=yes";
+        ss << "wifi: status=connected";
         ss << " ssid=" << buf;
-        snprintf(buf, sizeof(buf) - 1,
-                 " bssid=%.2x:%.2x:%.2x:%.2x:%.2x:%.2x",
-                 sta_connected->bssid[0],
-                 sta_connected->bssid[1],
-                 sta_connected->bssid[2],
-                 sta_connected->bssid[3],
-                 sta_connected->bssid[4],
-                 sta_connected->bssid[5]);
-        ss << buf;
-        ss << " chan=" << (int) sta_connected->channel;
         ss << " rssi=" << espWifi()->getRssi();
+        snprintf(buf, sizeof(buf) - 1,
+                 " ip=" IPSTR, IP2STR(&ip_info->ip));
+        ss << buf;
     }
 
     return ss.str();
@@ -301,34 +460,39 @@ string MeshRoof::handleNet(uint32_t node_num, string &message)
     stringstream ss;
     const esp_netif_ip_info_t *ip_info = espWifi()->getIpInfo();
     const esp_netif_dns_info_t *dns1_info = espWifi()->getDns1Info();
-    const esp_netif_dns_info_t *dns2_info = espWifi()->getDns2Info();
-    const esp_netif_dns_info_t *dns3_info = espWifi()->getDns3Info();
     char buf[80];
 
     (void)(node_num);
 
-    ss << (getIp() == 0 ? "net: mode=dhcp" : "net: mode=static");
+    string cmd = message;
+    trimWhitespace(cmd);
+    string first_word = cmd.substr(0, cmd.find(' '));
+    toLowercase(first_word);
+
+    if (first_word == "ping") {
+        string host = cmd.substr(first_word.size());
+        trimWhitespace(host);
+        if (host.empty()) {
+            return "net: ping requires host argument";
+        }
+        string target_ip;
+        uint32_t rtt_ms = 0;
+        if (pingHost(host, target_ip, rtt_ms)) {
+            snprintf(buf, sizeof(buf) - 1, "net: ping=%s rtt=%lums",
+                     target_ip.c_str(), (unsigned long) rtt_ms);
+            return string(buf);
+        } else {
+            snprintf(buf, sizeof(buf) - 1, "net: ping=%s failed", host.c_str());
+            return string(buf);
+        }
+    }
 
     snprintf(buf, sizeof(buf) - 1,
-             " ip=" IPSTR, IP2STR(&ip_info->ip));
-    ss << buf;
-    snprintf(buf, sizeof(buf) - 1,
-             " mask=" IPSTR, IP2STR(&ip_info->netmask));
-    ss << buf;
-    snprintf(buf, sizeof(buf) - 1,
-             " gw=" IPSTR, IP2STR(&ip_info->gw));
-    ss << buf;
-    snprintf(buf, sizeof(buf) - 1,
-             " dns1=" IPSTR, IP2STR(&dns1_info->ip.u_addr.ip4));
-    ss << buf;
-    snprintf(buf, sizeof(buf) - 1,
-             " dns2=" IPSTR, IP2STR(&dns2_info->ip.u_addr.ip4));
-    ss << buf;
-    snprintf(buf, sizeof(buf) - 1,
-             " dns3=" IPSTR, IP2STR(&dns3_info->ip.u_addr.ip4));
-    ss << buf;
-
-    return ss.str();
+             "net: ip=" IPSTR " gw=" IPSTR " dns=" IPSTR,
+             IP2STR(&ip_info->ip),
+             IP2STR(&ip_info->gw),
+             IP2STR(&dns1_info->ip.u_addr.ip4));
+    return string(buf);
 }
 
 string MeshRoof::handleAmplify(uint32_t node_num, string &message)
@@ -337,21 +501,52 @@ string MeshRoof::handleAmplify(uint32_t node_num, string &message)
 
     (void)(node_num);
 
-    toLowercase(message);
+    string args = message;
+    trimWhitespace(args);
+    string first_word = args.substr(0, args.find(' '));
+    toLowercase(first_word);
 
-    if (message.empty()) {
-        reply = string("amplify: pwr=") + (isAmplifying() ? "on" : "off");
-    } else if (message == "on") {
+    if (first_word.empty()) {
+        reply = "amplify: state=" + string(isAmplifying() ? "on" : "off") +
+                " gain=" + getAmplifierGain() +
+                " pa=" + getAmplifierPower();
+    } else if (first_word == "on") {
         amplify(true);
-        reply = "amplify: pwr=on";
-    } else if (message == "off") {
+        reply = "amplify: state=on";
+    } else if (first_word == "off") {
         amplify(false);
-        reply = "amplify: pwr=off";
+        reply = "amplify: state=off";
+    } else if (first_word == "gain") {
+        string level = args.substr(first_word.size());
+        trimWhitespace(level);
+        if (!level.empty()) {
+            setAmplifierGain(level);
+            reply = "amplify: gain=" + level;
+        } else {
+            reply = "amplify: gain=" + getAmplifierGain();
+        }
     } else {
         reply = "syntax error!";
     }
 
     return reply;
+}
+
+static const char *getResetReasonString(esp_reset_reason_t reason)
+{
+    switch (reason) {
+    case ESP_RST_POWERON:   return "poweron";
+    case ESP_RST_EXT:       return "ext";
+    case ESP_RST_SW:        return "software";
+    case ESP_RST_PANIC:     return "panic";
+    case ESP_RST_INT_WDT:   return "int_wdt";
+    case ESP_RST_TASK_WDT:  return "task_wdt";
+    case ESP_RST_WDT:       return "wdt";
+    case ESP_RST_DEEPSLEEP: return "deepsleep";
+    case ESP_RST_BROWNOUT:  return "brownout";
+    case ESP_RST_SDIO:      return "sdio";
+    default:                return "unknown";
+    }
 }
 
 string MeshRoof::handleReset(uint32_t node_num, string &message)
@@ -364,9 +559,8 @@ string MeshRoof::handleReset(uint32_t node_num, string &message)
 
     if (message.empty()) {
         ss << "reset: count=" << getResetCount();
-        if (getLastResetSecsAgo() != 0) {
-            ss << " last=" << getLastResetSecsAgo() << "s";
-        }
+        ss << " reason=" << getResetReasonString(esp_reset_reason());
+        ss << " secs_ago=" << getLastResetSecsAgo();
     } else if (message == "apply") {
         reset();
         ss << "reset: applied=yes";
@@ -379,14 +573,28 @@ string MeshRoof::handleReset(uint32_t node_num, string &message)
 
 string MeshRoof::handleBuzz(uint32_t node_num, string &message)
 {
-    string reply;
+    unsigned int freq = 2000;
+    unsigned int dur = 300;
 
     (void)(node_num);
-    (void)(message);
 
-    buzz();
+    string args = message;
+    trimWhitespace(args);
 
-    return reply;
+    if (!args.empty()) {
+        stringstream ss(args);
+        if (ss >> freq) {
+            if (!(ss >> dur)) {
+                dur = 300;
+            }
+        }
+    }
+
+    buzz(freq, dur);
+
+    stringstream ss_rep;
+    ss_rep << "buzz: freq=" << freq << " dur=" << dur;
+    return ss_rep.str();
 }
 
 string MeshRoof::handleMorse(uint32_t node_num, string &message)
@@ -394,10 +602,10 @@ string MeshRoof::handleMorse(uint32_t node_num, string &message)
     string reply;
 
     (void)(node_num);
-    (void)(message);
 
+    trimWhitespace(message);
     addMorseText(message);
-    reply = "morse: msg=" + message;
+    reply = "morse: text='" + message + "'";
 
     return reply;
 }

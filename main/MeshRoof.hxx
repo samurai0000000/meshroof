@@ -81,7 +81,14 @@ public:
     void flipOnboardLed(void);
 
     void buzz(unsigned int ms = 500);
+    void buzz(unsigned int freq, unsigned int ms);
     void buzzMorseCode(const string &text, bool clearPrevious = false);
+
+    string getAmplifierGain(void) const;
+    void setAmplifierGain(const string &gain);
+    string getAmplifierPower(void) const;
+
+    bool pingHost(const string &host, string &result_ip, uint32_t &rtt_ms);
 
     float getCpuTempC(void) const;
 
@@ -104,6 +111,7 @@ protected:
 
     virtual string handleUnknown(uint32_t node_num, uint32_t dest,
                                  uint8_t channel, string &message);
+    virtual string handleRollcall(uint32_t node_num, string &message);
     virtual string handleEnv(uint32_t node_num, string &message);
     virtual string handleStatus(uint32_t node_num, string &message);
     virtual string handleWifi(uint32_t node_num, string &message);
@@ -169,6 +177,7 @@ private:
     struct nvm_main_body _main_body;
 
     bool _isAmplifying;
+    string _amplifierGain;
     unsigned int _resetCount;
     time_t _lastReset;
     bool _onboardLed;

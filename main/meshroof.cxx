@@ -265,6 +265,8 @@ static void meshtastic_task(__unused void *params)
             last_heartbeat = now;
         }
 
+        meshroof->houseKeeping();
+
         while (serial_rx_ready() > 0) {
             ret = mt_serial_process(&meshroof->_mtc, 0);
             if (ret != 0) {

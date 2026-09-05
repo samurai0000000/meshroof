@@ -614,22 +614,29 @@ int MeshRoofShell::amplify(int argc, char **argv)
 
     if ((argc >= 2) &&
         ((strcmp(argv[1], "-h") == 0) || (strcmp(argv[1], "--help") == 0))) {
-        this->printf("Usage: %s [-h|--help] [on|off]\n", argv[0]);
+        this->printf("Usage: %s [-h|--help] [on|off|gain <level>]\n", argv[0]);
         this->printf("  Control RF amplifier or show state.\n");
         this->printf("Commands:\n");
         this->printf("  amplify                      Show amplifier state\n");
         this->printf("  amplify on|off               Turn RF amplifier on or off\n");
+        this->printf("  amplify gain <level>         Set amplifier gain preset\n");
         return 0;
     }
 
     if (argc == 1) {
-        this->printf("amplify: %s\n", meshroof->isAmplifying() ? "on" : "off");
+        this->printf("amplify: %s (gain=%s, pa=%s)\n",
+                     meshroof->isAmplifying() ? "on" : "off",
+                     meshroof->getAmplifierGain().c_str(),
+                     meshroof->getAmplifierPower().c_str());
     } else if ((argc == 2) && (strcmp(argv[1], "on") == 0)) {
         meshroof->amplify(true);
         this->printf("amplify on\n");
     } else if ((argc == 2) && (strcmp(argv[1], "off") == 0)) {
         meshroof->amplify(false);
         this->printf("amplify off\n");
+    } else if ((argc == 3) && (strcmp(argv[1], "gain") == 0)) {
+        meshroof->setAmplifierGain(argv[2]);
+        this->printf("gain: %s\n", argv[2]);
     } else {
         this->printf("syntax error!\n");
         ret = -1;
@@ -644,21 +651,36 @@ int MeshRoofShell::buzz(int argc, char **argv)
 
     if ((argc >= 2) &&
         ((strcmp(argv[1], "-h") == 0) || (strcmp(argv[1], "--help") == 0))) {
-        this->printf("Usage: %s [-h|--help] [duration_ms]\n", argv[0]);
+        this->printf("Usage: %s [-h|--help] [duration_ms | freq duration_ms]\n", argv[0]);
         this->printf("  Play buzzer tone.\n");
         this->printf("Arguments:\n");
-        this->printf("  duration_ms   Tone duration in milliseconds (default: 100)\n");
+        this->printf("  duration_ms         Tone duration in milliseconds (default: 500)\n");
+        this->printf("  freq duration_ms    Frequency in Hz and duration in milliseconds\n");
         return 0;
     }
 
     if (argc == 1) {
         meshroof->buzz();
-    } else if ((argc == 2)) {
+    } else if (argc == 2) {
         unsigned int ms;
 
         try {
             ms = stoul(argv[1]);
             meshroof->buzz(ms);
+        } catch (const invalid_argument &e) {
+            this->printf("syntax error!\n");
+            ret = -1;
+        } catch (const out_of_range &e) {
+            this->printf("syntax error!\n");
+            ret = -1;
+        }
+    } else if (argc == 3) {
+        unsigned int freq, ms;
+
+        try {
+            freq = stoul(argv[1]);
+            ms = stoul(argv[2]);
+            meshroof->buzz(freq, ms);
         } catch (const invalid_argument &e) {
             this->printf("syntax error!\n");
             ret = -1;
